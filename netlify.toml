@@ -1,0 +1,9 @@
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+[[redirects]]
+  from = "/share/:id"
+  to = "/.netlify/functions/video-share?id=:id"
+  status = 200
+  force = true
