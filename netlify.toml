@@ -4,6 +4,6 @@
 
 [[redirects]]
   from = "/share/:id"
-  to = "/.netlify/functions/video-share?id=:id"
+  to = "/.netlify/functions/video-preview?id=:id"
   status = 200
   force = true
