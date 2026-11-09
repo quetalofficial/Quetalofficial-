@@ -160,6 +160,43 @@
 </head>
 <body class="bg-darkbg text-white min-h-screen flex flex-col justify-between">
 
+<div id="quetal-install-banner" style="position:fixed;bottom:18px;left:12px;right:12px;z-index:9999;display:none;background:#101020;color:white;padding:16px;border:1px solid #00f0ff;border-radius:16px;text-align:center;box-shadow:0 0 20px #00f0ff55">
+  <strong>Get the Qué tal App 💜</strong>
+  <p style="font-size:13px;margin:8px 0">Install Qué tal on your phone and join our video community!</p>
+  <button id="quetal-install-btn" type="button" style="background:linear-gradient(90deg,#00f0ff,#a000ff);color:#000;font-weight:bold;padding:12px 22px;border:0;border-radius:12px">Install Qué tal App</button>
+  <button id="quetal-install-close" type="button" aria-label="Close" style="margin-left:12px;color:white;background:transparent;border:0;font-size:22px">×</button>
+</div>
+<script>
+(function () {
+  let installPrompt = null;
+  const banner = document.getElementById('quetal-install-banner');
+  const installButton = document.getElementById('quetal-install-btn');
+  const closeButton = document.getElementById('quetal-install-close');
+
+  window.addEventListener('beforeinstallprompt', function (event) {
+    event.preventDefault();
+    installPrompt = event;
+    banner.style.display = 'block';
+  });
+
+  installButton.addEventListener('click', async function () {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    await installPrompt.userChoice;
+    installPrompt = null;
+    banner.style.display = 'none';
+  });
+
+  closeButton.addEventListener('click', function () {
+    banner.style.display = 'none';
+  });
+
+  window.addEventListener('appinstalled', function () {
+    banner.style.display = 'none';
+  });
+})();
+</script>
+
     <!-- Top Global Header -->
     <header class="w-full bg-cardbg/80 backdrop-blur-md border-b border-zinc-800 px-6 py-4 flex justify-between items-center z-30">
         <div class="flex items-center space-x-3">
