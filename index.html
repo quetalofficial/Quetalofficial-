@@ -208,6 +208,19 @@
     <p>Open this website in Safari. Tap Share, choose "Add to Home Screen", keep "Open as Web App" enabled, then tap Add.</p>
   </div>
 </section>
+    <script>
+(function () {
+  const guide = document.getElementById('quetal-install-guide');
+  if (!guide) return;
+  guide.innerHTML = `
+    <h2 style="font-size:18px;font-weight:bold;margin-bottom:10px;">Get the Qué tal App 💜</h2>
+    <p style="font-size:16px;line-height:1.5;margin-bottom:8px;"><strong>🤖 Android:</strong> Open in Chrome. Tap "Install Qué tal App", or choose "Install app" from Chrome's menu.</p>
+    <p style="font-size:16px;line-height:1.5;"><strong>🍎 iPhone:</strong> Open in Safari. Tap Share → Add to Home Screen → Add.</p>
+  `;
+  guide.style.padding = '12px';
+  guide.style.margin = '8px 0';
+})();
+    </script>
     <!-- Top Global Header -->
     <header class="w-full bg-cardbg/80 backdrop-blur-md border-b border-zinc-800 px-6 py-4 flex justify-between items-center z-30">
         <div class="flex items-center space-x-3">
