@@ -259,6 +259,23 @@
                     </p>
                 </div>
             </div>
+             <script>
+(function () {
+  const guide = document.getElementById('quetal-install-guide');
+  const registration = document.getElementById('view-registration');
+  const welcome = registration.querySelector('.space-y-6');
+
+  if (guide && welcome) {
+    welcome.appendChild(guide);
+    guide.style.display = 'block';
+    guide.style.padding = '12px';
+    guide.style.margin = '12px 0';
+    guide.style.fontSize = '12px';
+    guide.querySelector('h2').style.fontSize = '16px';
+  }
+})();
+</script>
+
 
             <!-- Right Column: Registration Form -->
             <div class="bg-cardbg border border-neonpurple/50 rounded-3xl p-6 lg:p-8 neon-glow-purple relative">
