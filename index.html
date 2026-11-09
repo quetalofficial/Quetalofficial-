@@ -787,16 +787,49 @@
                 const {error: uploadError} = await sb.storage.from('videos').upload(path, file, {contentType:file.type, upsert:false});
                 if (uploadError) throw uploadError;
                 uploadedPath = path;
-                // Best-effort public thumbnail, used by WhatsApp/Open Graph previews.
+                
+                // Create a thumbnail for each video shared on WhatsApp.
+                let thumbnailUrl = null;
+
                 try {
                     const thumb = await makeVideoThumbnail(file);
+
                     if (thumb) {
                         const jpgPath = path.replace(/\.[^.]+$/, '.jpg');
-                        await sb.storage.from('videos').upload(jpgPath, thumb, {contentType:'image/jpeg',upsert:false});
+
+                        const { error: thumbnailError } = await sb.storage
+                            .from('videos')
+                            .upload(jpgPath, thumb, {
+                                contentType: 'image/jpeg',
+                                upsert: false
+                            });
+
+                        if (thumbnailError) {
+                            console.warn('Thumbnail upload failed:', thumbnailError);
+                        } else {
+                            const { data: urlData } = sb.storage
+                                .from('videos')
+                                .getPublicUrl(jpgPath);
+
+                            thumbnailUrl = urlData?.publicUrl || null;
+                        }
                     }
-                } catch (thumbnailError) { console.warn('Thumbnail not available', thumbnailError); }
-                const {error: postError} = await sb.from('video_posts').insert({user_id:activeUser.id, storage_path:path, caption, category:$('video-category').value});
+                } catch (thumbnailError) {
+                    console.warn('Thumbnail not available:', thumbnailError);
+                }
+
+                const { error: postError } = await sb
+                    .from('video_posts')
+                    .insert({
+                        user_id: activeUser.id,
+                        storage_path: path,
+                        caption,
+                        category: $('video-category').value,
+                        thumbnail_url: thumbnailUrl
+                    });
+
                 if (postError) throw postError;
+
                 videoMessage('Your video is published! 🎉');
                 $('video-upload-form').reset();
                 previewSelectedVideo();
