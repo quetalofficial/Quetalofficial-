@@ -187,6 +187,42 @@
 .qt-social-error{color:#ff9bba;font-size:12px;white-space:pre-wrap}
 .qt-social-nav button:focus-visible,.qt-social-btn:focus-visible,.qt-social-secondary:focus-visible{outline:2px solid #00f0ff;outline-offset:2px}
 @media(prefers-reduced-motion:reduce){.qt-social-nav *, .qt-social-panel *{animation:none!important}}
+
+/* Compact mobile feed layout, Nov 24: preserve full-viewport video. */
+body.qt-feed-active #quetal-install-guide,
+body.qt-feed-active #quetal-install-banner { display:none !important; }
+body.qt-feed-active .qt-feed-top {
+  top:0; padding: max(5px, env(safe-area-inset-top)) 10px 0;
+  align-items:flex-start; min-height:36px;
+}
+body.qt-feed-active .qt-feed-top h2 {font-size:15px;line-height:22px;white-space:nowrap;}
+body.qt-feed-active .qt-feed-top #feed-welcome {display:none;}
+body.qt-feed-active .qt-feed-top button {padding:5px 9px;font-size:11px;}
+body.qt-feed-active .qt-social-nav {
+  top:max(37px, calc(env(safe-area-inset-top) + 34px)); left:10px;right:10px;
+  max-width:none; flex-wrap:nowrap; gap:5px;
+}
+body.qt-feed-active .qt-social-nav button {padding:5px 8px;font-size:11px;white-space:nowrap;}
+body.qt-feed-active .qt-hashtag-search {
+  top:max(72px, calc(env(safe-area-inset-top) + 69px)); left:10px;right:10px;gap:6px;
+}
+body.qt-feed-active .qt-hashtag-search input {font-size:13px;padding:7px 10px;border-radius:13px;height:36px;}
+body.qt-feed-active .qt-hashtag-search button {font-size:12px;padding:5px 10px;border-radius:13px;height:36px;}
+body.qt-feed-active #video-feed-message {top:113px;}
+body.qt-feed-active .qt-video-info {
+  bottom:max(63px, calc(env(safe-area-inset-bottom) + 55px));
+  left:10px;right:80px;font-size:12px;
+}
+body.qt-feed-active .qt-video-info .qt-creator-link {padding:5px 8px;font-size:12px;}
+body.qt-feed-active .qt-video-info p {margin-top:2px;margin-bottom:2px;font-size:12px;line-height:1.3;}
+body.qt-feed-active .qt-video-info .qt-video-views {margin-top:2px;}
+body.qt-feed-active .qt-follow {bottom:max(52px, calc(env(safe-area-inset-bottom) + 45px));padding:6px 12px;}
+body.qt-feed-active .qt-feed-upload {bottom:max(8px,env(safe-area-inset-bottom));padding:8px 13px;font-size:12px;}
+body.qt-feed-active .qt-video-actions {top:120px;bottom:70px;right:5px;gap:5px;}
+body.qt-feed-active .qt-action {min-height:43px;min-width:49px;padding:2px;}
+body.qt-feed-active .qt-action i {font-size:23px;}
+@media(max-width:360px) {body.qt-feed-active .qt-social-nav button{font-size:10px;padding:5px 6px;}}
+
     </style>
 </head>
 <body class="bg-darkbg text-white min-h-screen flex flex-col justify-between">
@@ -803,6 +839,7 @@
             activeUser = null;
             qtClosePanel();
             document.body.classList.remove('qt-feed-active');
+            document.getElementById('quetal-install-guide').style.display = '';
             selectedInterests = [];
             $('view-onboarding').classList.add('hidden');
             $('view-feed').classList.add('hidden');
@@ -861,6 +898,7 @@
             $('view-feed').classList.remove('hidden');
             document.body.classList.add('qt-feed-active');
             document.getElementById('quetal-install-banner').style.display = 'none';
+            document.getElementById('quetal-install-guide').style.display = 'none';
             $('feed-welcome').textContent = 'Signed in as ' + (activeUser.user_metadata?.username || activeUser.email || 'Qué tal member');
             $('feed-interests').textContent = 'Your interests: ' + selectedInterests.join(' • ');
             loadVideos();
