@@ -3,7 +3,7 @@
 <head>
     <link rel="manifest" href="/manifest.webmanifest">
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Qué tal — Global Social Portal</title>
     <!-- Qué tal social link preview -->
     <meta name="description" content="Join Qué tal, a social video community. Sign up, discover videos and share your own.">
@@ -84,10 +84,12 @@
         #community-videos { height: min(76dvh, 790px); overflow-y: auto; scroll-snap-type: y mandatory; overscroll-behavior-y: contain; scrollbar-width: none; border-radius: 18px; }
         #community-videos::-webkit-scrollbar { display: none; }
         .qt-video-card { position: relative; height: 100%; min-height: 100%; scroll-snap-align: start; scroll-snap-stop: always; background: #000; overflow: hidden; }
-        .qt-video-card video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+        .qt-video-card video { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; background: #000; }
         .qt-video-shade { position: absolute; inset: auto 0 0 0; height: 48%; pointer-events: none; background: linear-gradient(transparent, rgba(0,0,0,.85)); }
         .qt-video-info { position: absolute; bottom: 14px; left: 12px; right: 78px; text-shadow: 0 1px 4px #000; }
         .qt-video-actions { position: absolute; bottom: 48px; right: 10px; display: flex; flex-direction: column; align-items: center; gap: 13px; }
+        .qt-video-views { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; color: #e5e7eb; margin-top: 5px; text-shadow: 0 1px 4px #000; }
+        .qt-video-views i { font-size: 12px; }
         .qt-action { background: rgba(10,10,20,.68); border: 1px solid rgba(255,255,255,.22); border-radius: 18px; padding: 8px 7px; min-width: 57px; color: white; font-size: 11px; font-weight: 700; }
         .qt-action i { display: block; font-size: 23px; margin-bottom: 3px; }
         .qt-action[aria-pressed="true"] { color: #ff75b4; }
@@ -96,15 +98,22 @@
         .qt-comment-list { max-height: 30dvh; overflow-y: auto; }
         @media (max-width: 640px) { #community-videos { height: 76dvh; } }
 
+        .qt-hashtag-search { display:flex; gap:8px; margin:10px 0; }
+        .qt-hashtag-search input { min-width:0; flex:1; border:1px solid #52525b; border-radius:18px; padding:9px 12px; color:white; background:#18181b; }
+        .qt-hashtag-search button { border:1px solid #52525b; border-radius:18px; padding:7px 12px; color:white; background:#27272a; }
+        body.qt-feed-active .qt-hashtag-search { position:absolute; z-index:15; top: max(74px, env(safe-area-inset-top)); left:12px; right:12px; margin:0; }
+        body.qt-feed-active #video-feed-message { top:125px; }
         /* Mobile-first immersive feed: controls float over videos instead of pushing them down. */
         body.qt-feed-active { overflow: hidden; }
         body.qt-feed-active > header, body.qt-feed-active > footer { display: none; }
         body.qt-feed-active > main { display: block; padding: 0; overflow: hidden; height: 100dvh; min-height: 0; }
         body.qt-feed-active #view-feed { display: block; position: relative; width: 100%; max-width: none; height: 100dvh; padding: 0; margin: 0; }
         body.qt-feed-active #community-videos { position: absolute; inset: 0; height: 100%; width: 100%; max-height: none; border-radius: 0; margin: 0; }
+        /* Each swipe snaps to a complete full-screen video; its controls remain overlaid. */
+        body.qt-feed-active .qt-video-card { height: 100dvh; min-height: 100dvh; }
         body.qt-feed-active #community-videos > * { margin-top: 0 !important; margin-bottom: 0 !important; }
         body.qt-feed-active .qt-video-card { height: 100%; min-height: 100%; }
-        body.qt-feed-active .qt-video-card video { object-fit: contain; }
+        body.qt-feed-active .qt-video-card video { width: 100%; height: 100%; object-fit: cover; object-position: center; }
         body.qt-feed-active .qt-feed-top { position: absolute; z-index: 12; top: 0; left: 0; right: 0; padding: max(14px, env(safe-area-inset-top)) 14px 12px; background: linear-gradient(rgba(0,0,0,.75),transparent); pointer-events: none; }
         body.qt-feed-active .qt-feed-top button { pointer-events: auto; }
         body.qt-feed-active .qt-feed-intro { display: none; }
@@ -156,6 +165,22 @@
         .qt-follow:disabled { opacity: .65; }
         body.qt-feed-active .qt-video-info { bottom: max(116px, env(safe-area-inset-bottom)); }
         @media(max-width: 400px) { .qt-reaction-picker { right: 45px; gap: 0; padding: 4px; } .qt-reaction-picker button { min-width: 32px; font-size: 21px; padding: 2px; } }
+
+/* Qué tal social expansion (after login only). Existing onboarding is unchanged. */
+.qt-social-nav{position:absolute;z-index:24;top:max(55px,env(safe-area-inset-top));left:10px;display:flex;gap:7px;flex-wrap:wrap;max-width:calc(100% - 85px)}
+.qt-social-nav button,.qt-creator-link{border-radius:20px;background:#141421d9;border:1px solid #ffffff55;padding:7px 10px;color:#fff;font-size:12px;font-weight:700}
+.qt-social-panel{position:fixed;z-index:60;inset:0;background:#080812;color:white;overflow:auto;padding:24px 16px max(30px,env(safe-area-inset-bottom))}
+.qt-social-panel.hidden{display:none}
+.qt-social-inner{max-width:560px;margin:auto;display:grid;gap:14px}
+.qt-social-panel input,.qt-social-panel textarea{width:100%;background:#171723;color:white;border:1px solid #646477;border-radius:12px;padding:11px;font-size:14px}
+.qt-social-btn{background:#22d3ee;color:#050508;border-radius:12px;padding:10px 14px;font-weight:700;font-size:13px}
+.qt-social-secondary{background:#242435;border:1px solid #555;color:white;border-radius:12px;padding:9px 12px;font-size:13px}
+.qt-social-card{background:#151521;border:1px solid #37374b;border-radius:16px;padding:14px;display:grid;gap:8px}
+.qt-social-avatar{height:54px;width:54px;border-radius:50%;object-fit:cover;background:#29293a}
+.qt-social-mini{font-size:12px;color:#b5b5cb}
+.qt-social-error{color:#ff9bba;font-size:12px;white-space:pre-wrap}
+.qt-social-nav button:focus-visible,.qt-social-btn:focus-visible,.qt-social-secondary:focus-visible{outline:2px solid #00f0ff;outline-offset:2px}
+@media(prefers-reduced-motion:reduce){.qt-social-nav *, .qt-social-panel *{animation:none!important}}
     </style>
 </head>
 <body class="bg-darkbg text-white min-h-screen flex flex-col justify-between">
@@ -221,6 +246,7 @@
   guide.style.margin = '8px 0';
 })();
     </script>
+
     <!-- Top Global Header -->
     <header class="w-full bg-cardbg/80 backdrop-blur-md border-b border-zinc-800 px-6 py-4 flex justify-between items-center z-30">
         <div class="flex items-center space-x-3">
@@ -268,28 +294,10 @@
                         <span class="text-glow-cyan" data-i18n="hero_title_1">Qué tal</span> <span data-i18n="hero_title_2">ile Dünyaya N'aber De!</span>
                     </h2>
                     <p class="text-sm text-zinc-400 mt-2" data-i18n="hero_desc">
-                      Discover a growing global video community where creators share their talents, stories, music, comedy, lifestyle, and more. Create your account, watch videos, share your moments, follow creators, and be part of something new. 💜 Creators welcome. Viewers welcome. Everyone has a place on Qué tal. 
-                        
+                        Yepyeni dikey akış, anlık coin ekonomisi ve yapay zeka destekli içerik keşfi seni bekliyor. Hemen kaydol, yerini al.
                     </p>
                 </div>
             </div>
-             <script>
-(function () {
-  const guide = document.getElementById('quetal-install-guide');
-  const registration = document.getElementById('view-registration');
-  const welcome = registration.querySelector('.space-y-6');
-
-  if (guide && welcome) {
-    welcome.appendChild(guide);
-    guide.style.display = 'block';
-    guide.style.padding = '12px';
-    guide.style.margin = '12px 0';
-    guide.style.fontSize = '12px';
-    guide.querySelector('h2').style.fontSize = '16px';
-  }
-})();
-</script>
-
 
             <!-- Right Column: Registration Form -->
             <div class="bg-cardbg border border-neonpurple/50 rounded-3xl p-6 lg:p-8 neon-glow-purple relative">
@@ -318,6 +326,14 @@
                         <div class="relative">
                             <i class="fa-solid fa-lock absolute left-3.5 top-3.5 text-zinc-400 text-xs"></i>
                             <input type="password" id="reg-password" required placeholder="••••••••" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl py-2.5 pl-10 pr-4 text-xs text-white focus:outline-none focus:border-neoncian transition">
+                        </div>
+                        <div id="qt-password-rules" class="mt-2 text-xs text-zinc-400" aria-live="polite">
+                            <p class="mb-1">Password requirements (for new accounts and password resets):</p>
+                            <div data-rule="length">○ At least 12 characters</div>
+                            <div data-rule="lower">○ One lowercase letter (a–z)</div>
+                            <div data-rule="upper">○ One uppercase letter (A–Z)</div>
+                            <div data-rule="number">○ One number (0–9)</div>
+                            <div data-rule="symbol">○ One symbol (!, @, #, etc.)</div>
                         </div>
                     </div>
 
@@ -397,6 +413,13 @@
 
         <!-- STEP 3: VIDEO FEED -->
         <section id="view-feed" class="hidden w-full max-w-xl py-6 space-y-5" aria-label="Qué tal feed">
+
+            <!-- New features appear ONLY after existing login and interest selection. -->
+            <nav class="qt-social-nav" aria-label="Qué tal member tools">
+              <button type="button" onclick="qtOpenPanel('me')"><i class="fa-regular fa-user"></i> My Profile</button>
+              <button type="button" onclick="qtOpenPanel('people')"><i class="fa-solid fa-magnifying-glass"></i> People</button>
+              <button type="button" onclick="qtOpenPanel('chats')"><i class="fa-regular fa-message"></i> Chat</button>
+            </nav>
             <div class="qt-feed-top flex items-center justify-between gap-3">
                 <div><h2 class="text-xl font-extrabold text-glow-cyan">Qué tal Feed 🚀</h2>
                 <p id="feed-welcome" class="text-xs text-zinc-400 mt-1"></p></div>
@@ -423,6 +446,7 @@
                             <option value="Music">Music & Dance</option><option value="Tech">Tech & AI</option><option value="Horror">Horror & Mystery</option><option value="Lifestyle">Lifestyle & Trends</option><option value="Art">Art & Design</option><option value="Comedy">Comedy & Humor</option>
                         </select>
                     </label>
+                    <p class="text-xs text-cyan-300">Add hashtags in your caption, for example #music #guyana. Viewers can search by hashtag.</p>
                     <p class="text-xs text-zinc-400">MP4, WebM or MOV. Maximum 50 MB. Only upload videos you have permission to share. Public posts can be viewed by anyone using Qué tal.</p>
                     <button id="publish-video-button" type="submit" class="w-full bg-neoncian text-black font-extrabold rounded-xl py-3">Publish Video</button>
                     <p id="video-upload-message" role="status" aria-live="polite" class="text-xs text-cyan-300"></p>
@@ -430,11 +454,25 @@
             </section>
             <div class="qt-feed-list-title flex justify-between items-center"><h3 class="font-bold text-lg">Community videos</h3><button type="button" onclick="loadVideos()" class="text-xs text-neoncian underline">Refresh</button></div>
             <p id="video-feed-message" class="text-xs text-zinc-400">Loading videos…</p>
+            <div id="qt-hashtag-search" class="qt-hashtag-search">
+                <label for="qt-tag-input" class="sr-only">Search video hashtags</label>
+                <input id="qt-tag-input" type="search" placeholder="Search hashtags: #music" maxlength="60" autocomplete="off" aria-label="Search hashtags">
+                <button type="button" id="qt-tag-clear" aria-label="Clear hashtag search">Clear</button>
+            </div>
             <div id="community-videos"></div>
         </section>
 
     </main>
 
+
+    <!-- Separate post-login overlay. No changes to registration, installation or onboarding. -->
+    <section id="qt-social-panel" class="qt-social-panel hidden" aria-label="Member profiles and messages" role="dialog" aria-modal="true">
+      <div class="qt-social-inner">
+        <div class="flex justify-between items-center gap-2"><h2 class="text-xl font-bold text-cyan-300" id="qt-social-title">Qué tal</h2><button class="qt-social-secondary" type="button" onclick="qtClosePanel()">✕ Back to videos</button></div>
+        <p class="qt-social-error" id="qt-social-message" role="status" aria-live="polite"></p>
+        <div id="qt-social-body"></div>
+      </div>
+    </section>
     <!-- Footer -->
     <footer class="w-full bg-cardbg/80 border-t border-zinc-800 px-6 py-3 text-center text-[10px] text-zinc-500">
         <p>© 2026 Qué tal • Discover, watch and share videos</p>
@@ -475,7 +513,6 @@
                 hero_title_1: "Say Hello",
                 hero_title_2: "with Qué tal!",
                 hero_desc: "A brand new vertical feed, instant coin economy, and AI-powered content discovery await you. Register now and claim your spot.",
-                hero_desc: "Discover a growing global video community where creators share their talents, stories, music, comedy, lifestyle, and more. Create your account, watch videos, share your moments, follow creators, and be part of something new. 💜 Creators welcome. Viewers welcome. Everyone has a place on Qué tal.",
                 form_title: "Create Account",
                 form_subtitle: "Join the Qué tal ecosystem in seconds.",
                 label_username: "Username",
@@ -671,6 +708,8 @@
             $('reg-password').parentElement.classList.toggle('hidden', reset);
             $('reg-username').required = signup;
             $('reg-password').required = !reset;
+            $('qt-password-rules').classList.toggle('hidden', !signup && !recovery);
+            updateQtPasswordRules();
             $('reg-email').parentElement.parentElement.classList.toggle('hidden', recovery);
             $('reg-email').required = !recovery;
             $('login-toggle').classList.toggle('hidden', mode === 'login' || recovery);
@@ -681,6 +720,22 @@
                 $('auth-submit').textContent = (translations[$('global-lang-select').value] || translations.en).btn_register;
             } else refreshAuthLabels();
         }
+        function qtPasswordChecks(password) {
+            return {length: password.length >= 12, lower: /[a-z]/.test(password),
+                upper: /[A-Z]/.test(password), number: /[0-9]/.test(password),
+                symbol: /[^A-Za-z0-9\s]/.test(password)};
+        }
+        function updateQtPasswordRules() {
+            const checks = qtPasswordChecks($('reg-password').value);
+            document.querySelectorAll('#qt-password-rules [data-rule]').forEach(row => {
+                const passed = checks[row.dataset.rule];
+                row.textContent = (passed ? '✓ ' : '○ ') + row.textContent.replace(/^[✓○]\s*/, '');
+                row.classList.toggle('text-green-400', passed);
+                row.classList.toggle('text-zinc-400', !passed);
+            });
+            return Object.values(checks).every(Boolean);
+        }
+        $('reg-password').addEventListener('input', updateQtPasswordRules);
         async function handleRegistration(e) {
             e.preventDefault();
             if (!sb) { msg('Setup needed: add the Supabase publishable (or anon) key to this HTML file before deploying.', true); return; }
@@ -691,6 +746,7 @@
             try {
                 const email = $('reg-email').value.trim();
                 const password = $('reg-password').value;
+                if ((authMode === 'signup' || authMode === 'recovery') && !updateQtPasswordRules()) throw new Error('Please meet all five password requirements.');
                 if (authMode === 'signup') {
                     const username = $('reg-username').value.trim();
                     if (!username) throw new Error('Please enter a username.');
@@ -710,7 +766,6 @@
                     if (error) throw error;
                     msg('If this email has an account, a password reset link will arrive shortly.');
                 } else if (authMode === 'recovery') {
-                    if (password.length < 6) throw new Error('Use a password of at least 6 characters.');
                     const {error} = await sb.auth.updateUser({password});
                     if (error) throw error;
                     setAuthMode('login');
@@ -740,6 +795,7 @@
         async function signOut() {
             if (sb) await sb.auth.signOut();
             activeUser = null;
+            qtClosePanel();
             document.body.classList.remove('qt-feed-active');
             selectedInterests = [];
             $('view-onboarding').classList.add('hidden');
@@ -868,49 +924,16 @@
                 const {error: uploadError} = await sb.storage.from('videos').upload(path, file, {contentType:file.type, upsert:false});
                 if (uploadError) throw uploadError;
                 uploadedPath = path;
-                
-                // Create a thumbnail for each video shared on WhatsApp.
-                let thumbnailUrl = null;
-
+                // Best-effort public thumbnail, used by WhatsApp/Open Graph previews.
                 try {
                     const thumb = await makeVideoThumbnail(file);
-
                     if (thumb) {
                         const jpgPath = path.replace(/\.[^.]+$/, '.jpg');
-
-                        const { error: thumbnailError } = await sb.storage
-                            .from('videos')
-                            .upload(jpgPath, thumb, {
-                                contentType: 'image/jpeg',
-                                upsert: false
-                            });
-
-                        if (thumbnailError) {
-                            console.warn('Thumbnail upload failed:', thumbnailError);
-                        } else {
-                            const { data: urlData } = sb.storage
-                                .from('videos')
-                                .getPublicUrl(jpgPath);
-
-                            thumbnailUrl = urlData?.publicUrl || null;
-                        }
+                        await sb.storage.from('videos').upload(jpgPath, thumb, {contentType:'image/jpeg',upsert:false});
                     }
-                } catch (thumbnailError) {
-                    console.warn('Thumbnail not available:', thumbnailError);
-                }
-
-                const { error: postError } = await sb
-                    .from('video_posts')
-                    .insert({
-                        user_id: activeUser.id,
-                        storage_path: path,
-                        caption,
-                        category: $('video-category').value,
-                        thumbnail_url: thumbnailUrl
-                    });
-
+                } catch (thumbnailError) { console.warn('Thumbnail not available', thumbnailError); }
+                const {error: postError} = await sb.from('video_posts').insert({user_id:activeUser.id, storage_path:path, caption, category:$('video-category').value});
                 if (postError) throw postError;
-
                 videoMessage('Your video is published! 🎉');
                 $('video-upload-form').reset();
                 previewSelectedVideo();
@@ -926,6 +949,21 @@
         }
         // Real video posts. Social actions require quetal-social-upgrade.sql in Supabase.
         let videoObserver = null;
+        const countedVideosThisSession = new Set();
+        const videoViewTimers = new Map();
+        const formatViewCount = n => Number(n).toLocaleString(undefined, {notation: n >= 1000 ? 'compact' : 'standard', maximumFractionDigits: 1});
+        async function refreshVideoViews(postId, label) {
+            const {data, error} = await sb.rpc('get_quetal_video_views', {p_post_id: postId});
+            if (!error && label.isConnected) label.textContent = formatViewCount(Number(data) || 0) + ' views';
+            else if (error) console.warn('Video view counter not configured:', error.message);
+        }
+        async function recordVideoView(postId, label) {
+            if (countedVideosThisSession.has(postId)) return;
+            countedVideosThisSession.add(postId);
+            const {data, error} = await sb.rpc('record_quetal_video_view', {p_post_id: postId});
+            if (!error && label.isConnected) label.textContent = formatViewCount(Number(data) || 0) + ' views';
+            else if (error) { countedVideosThisSession.delete(postId); console.warn('View could not be saved:', error.message); }
+        }
         const socialReadyError = 'Social features need the one-time Supabase setup. Ask the Qué tal administrator to install the social SQL file.';
         function el(tag, cls, content) {
             const node = document.createElement(tag);
@@ -943,20 +981,63 @@
             btn.addEventListener('touchstart', event => event.stopPropagation(), {passive:true});
             return {btn, txt};
         }
+        function qtTagQuery() {
+            return ($('qt-tag-input').value.trim().replace(/^#+/, '').match(/^[\p{L}\p{N}_]+/u)?.[0] || '').toLocaleLowerCase();
+        }
+        let qtSearchTimer = null;
+        let qtVideoLoadGeneration = 0;
+        $('qt-tag-input').addEventListener('input', () => {
+            clearTimeout(qtSearchTimer);
+            qtSearchTimer = setTimeout(() => loadVideos(), 450);
+        });
+        $('qt-tag-clear').addEventListener('click', () => {
+            clearTimeout(qtSearchTimer);
+            $('qt-tag-input').value = '';
+            loadVideos();
+        });
         async function loadVideos() {
             if (!sb || !activeUser) return;
+            const generation = ++qtVideoLoadGeneration;
             const feed = $('community-videos');
             const message = $('video-feed-message');
-            message.textContent = 'Loading videos…';
-            const {data, error} = await sb.from('video_posts').select('id,user_id,storage_path,caption,category,created_at').order('created_at',{ascending:false}).limit(50);
+            const tag = qtTagQuery();
+            message.textContent = tag ? `Searching all videos for #${tag}…` : 'Loading videos…';
+            let data = [], error = null;
+            if (!tag) {
+                const result = await sb.from('video_posts').select('id,user_id,storage_path,caption,category,created_at').order('created_at',{ascending:false}).limit(50);
+                data = result.data || []; error = result.error;
+            } else {
+                // Search server-side, page through the entire matching caption index,
+                // then verify exact hashtag boundaries (e.g. #art != #artist).
+                // Render at most 50 results to avoid loading excessive video media.
+                let offset = 0;
+                const batchSize = 200;
+                while (data.length < 50) {
+                    const result = await sb.from('video_posts')
+                        .select('id,user_id,storage_path,caption,category,created_at')
+                        .ilike('caption', '%#' + tag.replace(/[%,_\\]/g, '') + '%')
+                        .order('created_at',{ascending:false}).range(offset,offset+batchSize-1);
+                    if (result.error) { error = result.error; break; }
+                    const batch = result.data || [];
+                    data.push(...batch.filter(post => [...(post.caption || '').matchAll(/#([\p{L}\p{N}_]+)/gu)]
+                        .some(m => m[1].toLocaleLowerCase() === tag)).slice(0,50-data.length));
+                    if (batch.length < batchSize) break;
+                    offset += batchSize;
+                    if (generation !== qtVideoLoadGeneration) return;
+                }
+            }
+            if (generation !== qtVideoLoadGeneration) return;
             if (videoObserver) { videoObserver.disconnect(); videoObserver = null; }
+            for (const timer of videoViewTimers.values()) clearTimeout(timer);
+            videoViewTimers.clear();
             feed.replaceChildren();
             if (error) { message.textContent = 'Could not load videos: ' + error.message; return; }
-            if (!data?.length) { message.textContent = 'No videos yet. Be the first to upload!'; return; }
-            message.textContent = `${data.length} videos • Swipe up to see the next one`;
+            if (!data?.length) { message.textContent = tag ? `No videos tagged #${tag} found.` : 'No videos yet. Be the first to upload!'; return; }
+            message.textContent = tag ? `${data.length} video(s) tagged #${tag} • Swipe for more` : `${data.length} videos • Swipe up to see the next one`;
             for (const post of data) {
                 const article = el('article', 'qt-video-card');
                 article.dataset.postId = post.id;
+                article.dataset.caption = post.caption || '';
                 const player = el('video');
                 player.playsInline = true;
                 player.preload = 'metadata';
@@ -972,7 +1053,28 @@
                 const creator = el('p','font-bold text-sm mb-1', post.user_id === activeUser.id ? '@You' : '@Creator ' + String(post.user_id).slice(0,6));
                 const caption = el('p','text-sm break-words',post.caption);
                 const category = el('p','text-xs text-zinc-300 mt-1',post.category);
-                info.append(creator,caption,category);
+                const viewLine = el('div','qt-video-views');
+                const eye = el('i','fa-regular fa-eye');
+                eye.setAttribute('aria-hidden','true');
+                const viewLabel = el('span','','— views');
+                viewLine.append(eye, viewLabel);
+                creator.classList.add('qt-creator-link');
+                creator.setAttribute('role','button'); creator.tabIndex=0;
+                creator.addEventListener('click',()=>qtOpenPanel('user',post.user_id));
+                creator.addEventListener('keydown',e=>{if(e.key==='Enter')qtOpenPanel('user',post.user_id);});
+                info.append(creator,caption,category,viewLine);
+                const hashtags = [...new Set([...(post.caption || '').matchAll(/#([\p{L}\p{N}_]+)/gu)].map(m => m[1]))].slice(0,15);
+                if (hashtags.length) {
+                    const tagsRow = el('div','flex flex-wrap gap-2 mt-1');
+                    hashtags.forEach(tag => {
+                        const button = el('button','text-cyan-300 text-xs underline','#' + tag);
+                        button.type = 'button';
+                        button.addEventListener('click', () => { $('qt-tag-input').value = '#' + tag; loadVideos(); });
+                        tagsRow.append(button);
+                    });
+                    info.append(tagsRow);
+                }
+                refreshVideoViews(post.id,viewLabel);
                 const actions = el('div','qt-video-actions');
                 const sound = actionButton('fa-volume-xmark','Sound off', () => {
                     player.muted = !player.muted;
@@ -1086,8 +1188,21 @@
                 for (const entry of entries) {
                     const video = entry.target.querySelector('video');
                     if (!video) continue;
-                    if (entry.isIntersecting && entry.intersectionRatio >= .65 && !document.hidden) video.play().catch(()=>{});
-                    else video.pause();
+                    const postId = entry.target.dataset.postId;
+                    if (videoViewTimers.has(postId)) { clearTimeout(videoViewTimers.get(postId)); videoViewTimers.delete(postId); }
+                    if (entry.isIntersecting && entry.intersectionRatio >= .65 && !document.hidden) {
+                        video.play().catch(()=>{});
+                        if (!countedVideosThisSession.has(postId)) {
+                            const timer = setTimeout(() => {
+                                videoViewTimers.delete(postId);
+                                if (!document.hidden && !video.paused && video.currentTime >= 2.5) {
+                                    const label = entry.target.querySelector('.qt-video-views span');
+                                    if (label) recordVideoView(postId,label);
+                                }
+                            }, 3000);
+                            videoViewTimers.set(postId,timer);
+                        }
+                    } else video.pause();
                 }
             },{root:feed,threshold:[0,.65,1]});
             feed.querySelectorAll('.qt-video-card').forEach(card=>videoObserver.observe(card));
@@ -1095,7 +1210,11 @@
             if (hashId) feed.querySelectorAll('.qt-video-card').forEach(card => {if (card.dataset.postId === hashId) card.scrollIntoView({block:'nearest'});});
         }
         document.addEventListener('visibilitychange', () => {
-            if (document.hidden) document.querySelectorAll('#community-videos video').forEach(v=>v.pause());
+            if (document.hidden) {
+                document.querySelectorAll('#community-videos video').forEach(v=>v.pause());
+                for (const timer of videoViewTimers.values()) clearTimeout(timer);
+                videoViewTimers.clear();
+            }
         });
         async function openComments(article, post) {
             const existingPanel = article.querySelector('.qt-comments');
@@ -1132,6 +1251,178 @@
             });
             await refresh();
         }
+
+        // --- NEW: optional member tools. They do not alter signup/login/onboarding. ---
+        const qtSocialBody = () => document.getElementById('qt-social-body');
+        const qtSocialMsg = (s='') => { document.getElementById('qt-social-message').textContent = s; };
+        let qtCurrentPanel = null;
+        const qtProfileImage = p => p?.avatar_path ? sb.storage.from('quetal-avatars').getPublicUrl(p.avatar_path).data.publicUrl : '';
+        const qtBtn = (text,fn,secondary=false) => {const b=el('button',secondary?'qt-social-secondary':'qt-social-btn',text);b.type='button';b.onclick=fn;return b;};
+        const qtField = (label,value='',max=100,multiline=false) => {
+          const wrap=el('label','block text-sm');wrap.append(el('span','block mb-2',label));
+          const field=el(multiline?'textarea':'input');field.value=value||'';field.maxLength=max;
+          if(multiline)field.rows=3;
+          wrap.append(field);return {wrap,field};
+        };
+        const qtRow = (...nodes) => {const d=el('div','flex flex-wrap gap-2 items-center');d.append(...nodes);return d;};
+        async function qtReadProfile(uid) {
+          const {data,error}=await sb.from('qt_profiles').select('user_id,display_name,bio,status,avatar_path').eq('user_id',uid).maybeSingle();
+          if(error) throw error;return data;
+        }
+        async function qtOpenPanel(type='me',uid=null) {
+          if(!activeUser) return;
+          qtCurrentPanel={type,uid};
+          document.getElementById('qt-social-panel').classList.remove('hidden');
+          document.querySelectorAll('#community-videos video').forEach(v=>v.pause());
+          qtSocialBody().replaceChildren();qtSocialMsg('');
+          document.getElementById('qt-social-title').textContent=({me:'My Profile',user:'Member Profile',people:'Discover People',chats:'Qué tal Chat',chat:'Conversation',requests:'Message Requests'})[type]||'Qué tal';
+          try {
+            if(type==='me') await qtShowMyProfile();
+            if(type==='user') await qtShowUserProfile(uid);
+            if(type==='people') await qtShowPeople();
+            if(type==='chats') await qtShowChats();
+            if(type==='chat') await qtShowConversation(uid);
+            if(type==='requests') await qtShowRequests();
+          } catch(e){qtSocialMsg('Member features are not configured yet: '+(e.message||e));}
+        }
+        function qtClosePanel(){document.getElementById('qt-social-panel').classList.add('hidden');qtCurrentPanel=null;}
+        async function qtShowMyProfile(){
+          const p=await qtReadProfile(activeUser.id)||{};
+          const form=el('div','qt-social-card');
+          const head=el('div','flex items-center gap-3');
+          const avatar=el('img','qt-social-avatar');avatar.alt='Your profile picture';
+          if(qtProfileImage(p))avatar.src=qtProfileImage(p);
+          else avatar.setAttribute('aria-label','No profile picture uploaded');
+          head.append(avatar,el('strong','',p.display_name||activeUser.user_metadata?.username||'Your profile'));
+          const name=qtField('Display name',p.display_name||activeUser.user_metadata?.username||'',60);
+          const bio=qtField('Biography (optional)',p.bio||'',240,true);
+          const status=qtField('Current status (optional)',p.status||'',140,true);
+          const fileLab=el('label','block text-sm','Profile picture (JPG, PNG or WebP, max 2 MB)');
+          const file=el('input');file.type='file';file.accept='image/jpeg,image/png,image/webp';fileLab.append(file);
+          const save=qtBtn('Save profile',async()=>{
+            save.disabled=true;qtSocialMsg('Saving...');
+            try {
+              let avatarPath=p.avatar_path||null;
+              const photo=file.files?.[0];
+              if(photo){
+                if(!['image/jpeg','image/png','image/webp'].includes(photo.type)||photo.size>2*1024*1024)throw Error('Use a JPG, PNG or WebP under 2 MB.');
+                const ext={'image/jpeg':'jpg','image/png':'png','image/webp':'webp'}[photo.type];
+                avatarPath=`${activeUser.id}/avatar-${crypto.randomUUID()}.${ext}`;
+                const {error}=await sb.storage.from('quetal-avatars').upload(avatarPath,photo,{contentType:photo.type,upsert:false});
+                if(error)throw error;
+              }
+              const {error}=await sb.from('qt_profiles').upsert({user_id:activeUser.id,display_name:name.field.value.trim().slice(0,60),bio:bio.field.value.trim().slice(0,240),status:status.field.value.trim().slice(0,140),avatar_path:avatarPath},{onConflict:'user_id'});
+              if(error)throw error;
+              qtSocialMsg('Profile saved!');await qtShowMyProfile();
+            }catch(e){qtSocialMsg('Could not save: '+e.message);}finally{save.disabled=false;}
+          });
+          form.append(head,name.wrap,bio.wrap,status.wrap,fileLab,save);
+          const videos=el('div','qt-social-card');videos.append(el('h3','font-bold','My videos'));
+          const {data,error}=await sb.from('video_posts').select('caption,created_at').eq('user_id',activeUser.id).order('created_at',{ascending:false}).limit(30);
+          if(!error)videos.append(...(data?.length?data.map(v=>el('p','text-sm border-b border-zinc-700 py-2',v.caption)): [el('p','qt-social-mini','No uploaded videos yet.') ]));
+          qtSocialBody().replaceChildren(form,videos);
+        }
+        async function qtBlocked(uid){
+          const {data,error}=await sb.from('qt_blocks').select('blocker_id').eq('blocker_id',activeUser.id).eq('blocked_id',uid).maybeSingle();
+          if(error)throw error;return !!data;
+        }
+        async function qtShowUserProfile(uid){
+          if(uid===activeUser.id)return qtShowMyProfile();
+          const p=await qtReadProfile(uid);
+          if(!p){qtSocialMsg('This member has not created a public profile yet.');return;}
+          const card=el('div','qt-social-card');
+          const img=el('img','qt-social-avatar');img.alt='Member avatar';if(qtProfileImage(p))img.src=qtProfileImage(p);
+          card.append(qtRow(img,el('strong','',p.display_name||'Qué tal member')),
+            el('p','text-sm',p.bio||'No biography yet.'),el('p','qt-social-mini','Status: '+(p.status||'No status')));
+          const blocked=await qtBlocked(uid);
+          const actions=qtRow();
+          if(!blocked)actions.append(qtBtn('Message request',async()=>{
+            const {error}=await sb.from('qt_message_requests').insert({sender_id:activeUser.id,recipient_id:uid});
+            qtSocialMsg(error?'Request not sent: '+error.message:'Message request sent. They must accept before you can chat.');
+          }));
+          actions.append(qtBtn(blocked?'Unblock member':'Block member',async()=>{
+            const result=blocked?await sb.from('qt_blocks').delete().eq('blocker_id',activeUser.id).eq('blocked_id',uid):await sb.from('qt_blocks').insert({blocker_id:activeUser.id,blocked_id:uid});
+            if(result.error)qtSocialMsg(result.error.message);else qtOpenPanel('user',uid);
+          },true));
+          actions.append(qtBtn('Report member',()=>qtReportForm('user',uid),true));
+          card.append(actions);qtSocialBody().replaceChildren(card);
+        }
+        async function qtShowPeople(){
+          const search=qtField('Find members by name','',60);
+          const results=el('div','grid gap-2');
+          const find=qtBtn('Search',async()=>{
+            results.replaceChildren();
+            const name=search.field.value.trim().replace(/[%_]/g,'');
+            if(name.length<2){qtSocialMsg('Enter at least 2 letters.');return;}
+            const {data,error}=await sb.from('qt_profiles').select('user_id,display_name,status,avatar_path').ilike('display_name','%'+name+'%').neq('user_id',activeUser.id).limit(20);
+            if(error){qtSocialMsg(error.message);return;}
+            if(!data?.length){results.append(el('p','qt-social-mini','No matching profiles yet.'));return;}
+            data.forEach(p=>{
+              const c=el('div','qt-social-card');
+              c.append(el('strong','',p.display_name||'Member'),el('p','qt-social-mini',p.status||''),qtBtn('View profile',()=>qtOpenPanel('user',p.user_id)));
+              results.append(c);
+            });
+          });
+          qtSocialBody().replaceChildren(search.wrap,find,results);
+        }
+        async function qtShowChats(){
+          const body=qtSocialBody();body.replaceChildren(qtRow(qtBtn('Message requests',()=>qtOpenPanel('requests')),qtBtn('Find people',()=>qtOpenPanel('people'),true)));
+          const {data,error}=await sb.from('qt_message_requests').select('id,sender_id,recipient_id,status').eq('status','accepted').or(`sender_id.eq.${activeUser.id},recipient_id.eq.${activeUser.id}`).limit(50);
+          if(error)throw error;
+          if(!data?.length){body.append(el('p','qt-social-mini','No conversations yet. Search for a member and send a message request.'));return;}
+          for(const r of data){const other=r.sender_id===activeUser.id?r.recipient_id:r.sender_id;
+            const p=await qtReadProfile(other);body.append(qtBtn('Chat with '+(p?.display_name||'member'),()=>qtOpenPanel('chat',other),true));}
+        }
+        async function qtShowRequests(){
+          const body=qtSocialBody();body.replaceChildren();
+          const {data,error}=await sb.from('qt_message_requests').select('id,sender_id').eq('recipient_id',activeUser.id).eq('status','pending').limit(50);
+          if(error)throw error;
+          if(!data?.length){body.append(el('p','qt-social-mini','No pending message requests.'));return;}
+          for(const r of data){const p=await qtReadProfile(r.sender_id);const card=el('div','qt-social-card');
+            card.append(el('strong','',p?.display_name||'Member'),qtRow(
+              qtBtn('Accept',()=>qtRespondRequest(r.id,'accepted')),
+              qtBtn('Decline',()=>qtRespondRequest(r.id,'declined'),true),
+              qtBtn('View profile',()=>qtOpenPanel('user',r.sender_id),true)));
+            body.append(card);}
+        }
+        async function qtRespondRequest(id,status){
+          const {error}=await sb.from('qt_message_requests').update({status}).eq('id',id).eq('recipient_id',activeUser.id);
+          if(error)qtSocialMsg(error.message);else qtOpenPanel('requests');
+        }
+        async function qtShowConversation(other){
+          const body=qtSocialBody();body.replaceChildren();
+          const {data:req,error:reqErr}=await sb.from('qt_message_requests').select('id').eq('status','accepted')
+            .or(`and(sender_id.eq.${activeUser.id},recipient_id.eq.${other}),and(sender_id.eq.${other},recipient_id.eq.${activeUser.id})`).limit(1);
+          if(reqErr)throw reqErr;
+          if(!req?.length){body.append(el('p','qt-social-mini','An accepted message request is needed before chatting.'));return;}
+          const rId=req[0].id;
+          const box=el('div','qt-social-card');
+          const list=el('div','grid gap-2');
+          const refresh=async()=>{
+            const {data,error}=await sb.from('qt_messages').select('sender_id,body,created_at').eq('request_id',rId).order('created_at',{ascending:true}).limit(100);
+            if(error){qtSocialMsg(error.message);return;}
+            list.replaceChildren(...(data||[]).map(m=>el('p','text-sm break-words',`${m.sender_id===activeUser.id?'You':'Member'}: ${m.body}`)));
+          };
+          const input=qtField('Your message','',1000,true);
+          box.append(list,input.wrap,qtRow(qtBtn('Send',async()=>{
+            const msg=input.field.value.trim();if(!msg)return;
+            const {error}=await sb.from('qt_messages').insert({request_id:rId,sender_id:activeUser.id,body:msg});
+            if(error)qtSocialMsg(error.message);else{input.field.value='';await refresh();}
+          }),qtBtn('Refresh messages',refresh,true),qtBtn('View member',()=>qtOpenPanel('user',other),true)));
+          body.append(box);await refresh();
+        }
+        function qtReportForm(type,target){
+          const reason=qtField('Why are you reporting this member?','',500,true);
+          const card=el('div','qt-social-card');
+          card.append(el('strong','','Report member'),reason.wrap,qtBtn('Submit report',async()=>{
+            const details=reason.field.value.trim();if(details.length<5){qtSocialMsg('Please give a short explanation.');return;}
+            const {error}=await sb.from('qt_reports').insert({reporter_id:activeUser.id,reported_user_id:target,reason:details});
+            if(error)qtSocialMsg(error.message);else{await qtOpenPanel('user',target);qtSocialMsg('Report submitted privately for review.');}
+          }),qtBtn('Cancel',()=>qtOpenPanel('user',target),true));
+          qtSocialBody().replaceChildren(card);
+        }
+        // Close optional member tools on sign out; existing auth remains unchanged.
+
         function showToast(message) {
             const toast = document.createElement('div');
             toast.className = 'fixed top-5 right-5 bg-zinc-900 border border-neoncian text-white text-xs font-bold px-4 py-3 rounded-2xl z-50 neon-glow-cyan shadow-xl animate-in fade-in slide-in-from-top duration-200 flex items-center space-x-2';
