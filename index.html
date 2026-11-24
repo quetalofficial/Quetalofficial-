@@ -80,6 +80,12 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #9D00FF;
         }
+        /* Installation belongs to the scrollable welcome/signup page, never the video feed. */
+        body.qt-feed-active #quetal-install-guide,
+        body.qt-feed-active #quetal-install-banner { display: none !important; }
+        body:not(.qt-feed-active) { overflow-y: auto; }
+        body:not(.qt-feed-active) > main { overflow: visible; flex-shrink: 0; }
+        body:not(.qt-feed-active) #view-registration { align-self: start; }
         /* Full-height, swipeable short-video feed */
         #community-videos { height: min(76dvh, 790px); overflow-y: auto; scroll-snap-type: y mandatory; overscroll-behavior-y: contain; scrollbar-width: none; border-radius: 18px; }
         #community-videos::-webkit-scrollbar { display: none; }
@@ -201,7 +207,7 @@
   window.addEventListener('beforeinstallprompt', function (event) {
     event.preventDefault();
     installPrompt = event;
-    banner.style.display = 'block';
+    if (!document.body.classList.contains('qt-feed-active')) banner.style.display = 'block';
   });
 
   installButton.addEventListener('click', async function () {
@@ -854,6 +860,7 @@
             $('view-onboarding').classList.add('hidden');
             $('view-feed').classList.remove('hidden');
             document.body.classList.add('qt-feed-active');
+            document.getElementById('quetal-install-banner').style.display = 'none';
             $('feed-welcome').textContent = 'Signed in as ' + (activeUser.user_metadata?.username || activeUser.email || 'Qué tal member');
             $('feed-interests').textContent = 'Your interests: ' + selectedInterests.join(' • ');
             loadVideos();
