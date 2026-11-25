@@ -93,7 +93,8 @@
         .qt-tap-play { position:absolute; z-index:4; top:45%; left:50%; transform:translate(-50%,-50%); width:76px; height:76px; border-radius:50%; background:rgba(0,0,0,.68); border:2px solid rgba(255,255,255,.85); color:white; font-size:34px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
         .qt-tap-play.qt-playing { opacity:.12; }
         .qt-tap-play.qt-playing:focus, .qt-tap-play.qt-playing:active { opacity:1; }
-        .qt-video-card video { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; background: #000; }
+        .qt-video-poster { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; background:#141421; pointer-events:none; }
+        .qt-video-card video { position:relative; z-index:1; display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; background: #000; }
         .qt-video-shade { position: absolute; inset: auto 0 0 0; height: 48%; pointer-events: none; background: linear-gradient(transparent, rgba(0,0,0,.85)); }
         .qt-video-info { position: absolute; bottom: 14px; left: 12px; right: 78px; text-shadow: 0 1px 4px #000; }
         .qt-video-actions { position: absolute; bottom: 48px; right: 10px; display: flex; flex-direction: column; align-items: center; gap: 13px; }
@@ -1169,15 +1170,32 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
                 player.loop = true;
                 player.muted = true; // Mobile browsers allow muted autoplay; viewers can turn sound on.
                 player.controls = false;
+                player.style.visibility = 'hidden';
                 player.setAttribute('aria-label', 'Video: ' + post.caption);
                 const {data: urlData} = sb.storage.from('videos').getPublicUrl(post.storage_path);
                 // No network video request until the viewer explicitly presses Play.
                 player.dataset.videoUrl = urlData.publicUrl;
+                // Uploads already attempt to save a separate JPEG thumbnail. Display that
+                // small image instead of downloading the video before a tap.
+                const poster = el('img', 'qt-video-poster');
+                poster.alt = 'Preview for ' + (post.caption || 'video');
+                poster.loading = 'lazy';
+                poster.decoding = 'async';
+                poster.referrerPolicy = 'no-referrer';
+                const jpgPath = post.storage_path.replace(/\.[^.]+$/, '.jpg');
+                const {data: posterUrlData} = sb.storage.from('videos').getPublicUrl(jpgPath);
+                poster.src = posterUrlData.publicUrl;
+                poster.addEventListener('error', () => {
+                    // Older posts may not have a saved thumbnail.
+                    poster.removeAttribute('src');
+                    poster.style.background = 'linear-gradient(145deg,#17304c,#452069 55%,#1c5361)';
+                }, {once:true});
                 const playButton = el('button', 'qt-tap-play', '▶');
                 playButton.type = 'button';
                 playButton.setAttribute('aria-label', 'Play video');
                 const stopVideo = () => {
                     player.pause();
+                    player.style.visibility = 'hidden';
                     playButton.classList.remove('qt-playing');
                     playButton.textContent = '▶';
                     playButton.setAttribute('aria-label', 'Play video');
@@ -1195,6 +1213,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
                     if (!player.hasAttribute('src')) player.src = player.dataset.videoUrl;
                     try {
                         await player.play();
+                        player.style.visibility = 'visible';
                         if (!countedVideosThisSession.has(post.id)) {
                             const timer = setTimeout(() => {
                                 videoViewTimers.delete(post.id);
@@ -1346,7 +1365,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
                 follow.btn.querySelector('i').remove();
                 actions.addEventListener('touchmove', event => event.stopPropagation(), {passive:true});
                 actions.append(sound.btn,like.btn,comment.btn,share.btn);
-                article.append(player,shade,playButton,info,actions,follow.btn);
+                article.append(poster,player,shade,playButton,info,actions,follow.btn);
                 feed.appendChild(article);
             }
             videoObserver = new IntersectionObserver(entries => {
