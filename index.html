@@ -94,7 +94,8 @@
         .qt-tap-play.qt-playing { opacity:.12; }
         .qt-tap-play.qt-playing:focus, .qt-tap-play.qt-playing:active { opacity:1; }
         .qt-video-poster { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; background:#141421; pointer-events:none; }
-        .qt-video-card video { position:relative; z-index:1; display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; background: #000; }
+        .qt-video-card video.qt-preview-frame { position:absolute; inset:0; z-index:0; background:transparent; pointer-events:none; }
+        .qt-video-card video:not(.qt-preview-frame) { position:relative; z-index:1; display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; background: #000; }
         .qt-video-shade { position: absolute; inset: auto 0 0 0; height: 48%; pointer-events: none; background: linear-gradient(transparent, rgba(0,0,0,.85)); }
         .qt-video-info { position: absolute; bottom: 14px; left: 12px; right: 78px; text-shadow: 0 1px 4px #000; }
         .qt-video-actions { position: absolute; bottom: 48px; right: 10px; display: flex; flex-direction: column; align-items: center; gap: 13px; }
@@ -1185,11 +1186,47 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
                 const jpgPath = post.storage_path.replace(/\.[^.]+$/, '.jpg');
                 const {data: posterUrlData} = sb.storage.from('videos').getPublicUrl(jpgPath);
                 poster.src = posterUrlData.publicUrl;
+                // Older posts may not have a JPEG. Preview a paused frame from the video
+                // when its card is visible. Never autoplay or load off-screen videos.
+                const frame = el('video', 'qt-preview-frame');
+                frame.muted = true;
+                frame.playsInline = true;
+                frame.preload = 'metadata';
+                frame.setAttribute('aria-hidden', 'true');
+                frame.style.display = 'none';
+                let needsFrame = false;
+                let frameReady = false;
+                const requestFrame = () => {
+                    if (!needsFrame || frameReady || frame.hasAttribute('src')) return;
+                    frame.style.display = 'block';
+                    frame.src = player.dataset.videoUrl;
+                    frame.load();
+                };
+                const releaseFrame = () => {
+                    if (frame.hasAttribute('src')) {
+                        frame.pause(); frame.removeAttribute('src'); frame.load();
+                    }
+                    if (!frameReady) frame.style.display = 'none';
+                };
+                frame.addEventListener('loadedmetadata', () => {
+                    try { frame.currentTime = Math.min(0.35, Math.max(0.05, (frame.duration || 1) / 10)); }
+                    catch (_) { /* Some browsers display the initial frame without seeking. */ }
+                });
+                frame.addEventListener('seeked', () => { frame.pause(); frameReady = true; });
+                frame.addEventListener('error', () => { releaseFrame(); frame.style.display='none'; });
                 poster.addEventListener('error', () => {
-                    // Older posts may not have a saved thumbnail.
-                    poster.removeAttribute('src');
-                    poster.style.background = 'linear-gradient(145deg,#17304c,#452069 55%,#1c5361)';
+                    poster.remove();
+                    needsFrame = true;
+                    if (article.dataset.qtVisible === 'true') requestFrame();
                 }, {once:true});
+                article.addEventListener('qt-preview-visible', () => {
+                    article.dataset.qtVisible = 'true';
+                    requestFrame();
+                });
+                article.addEventListener('qt-preview-hidden', () => {
+                    article.dataset.qtVisible = 'false';
+                    if (!frameReady) releaseFrame();
+                });
                 const playButton = el('button', 'qt-tap-play', '▶');
                 playButton.type = 'button';
                 playButton.setAttribute('aria-label', 'Play video');
@@ -1207,7 +1244,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
                 };
                 const toggleVideo = async () => {
                     if (!player.paused) { stopVideo(); return; }
-                    document.querySelectorAll('#community-videos video').forEach(v => {
+                    document.querySelectorAll('#community-videos video:not(.qt-preview-frame)').forEach(v => {
                         if (v !== player) v.dispatchEvent(new Event('qt-stop-video'));
                     });
                     if (!player.hasAttribute('src')) player.src = player.dataset.videoUrl;
@@ -1365,18 +1402,22 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
                 follow.btn.querySelector('i').remove();
                 actions.addEventListener('touchmove', event => event.stopPropagation(), {passive:true});
                 actions.append(sound.btn,like.btn,comment.btn,share.btn);
-                article.append(poster,player,shade,playButton,info,actions,follow.btn);
+                article.append(poster,frame,player,shade,playButton,info,actions,follow.btn);
                 feed.appendChild(article);
             }
             videoObserver = new IntersectionObserver(entries => {
                 for (const entry of entries) {
-                    const video = entry.target.querySelector('video');
+                    const video = entry.target.querySelector('video:not(.qt-preview-frame)');
                     if (!video) continue;
                     const postId = entry.target.dataset.postId;
                     if (videoViewTimers.has(postId)) { clearTimeout(videoViewTimers.get(postId)); videoViewTimers.delete(postId); }
                     if (entry.isIntersecting && entry.intersectionRatio >= .65 && !document.hidden) {
-                        // Only user-initiated playback; never autoplay on scroll.
-                    } else video.dispatchEvent(new Event('qt-stop-video'));
+                        // Only fetch a paused preview frame for missing thumbnails. Never autoplay.
+                        entry.target.dispatchEvent(new Event('qt-preview-visible'));
+                    } else {
+                        entry.target.dispatchEvent(new Event('qt-preview-hidden'));
+                        video.dispatchEvent(new Event('qt-stop-video'));
+                    }
                 }
             },{root:feed,threshold:[0,.65,1]});
             feed.querySelectorAll('.qt-video-card').forEach(card=>videoObserver.observe(card));
@@ -1385,7 +1426,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
         }
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) {
-                document.querySelectorAll('#community-videos video').forEach(v=>v.dispatchEvent(new Event('qt-stop-video')));
+                document.querySelectorAll('#community-videos video:not(.qt-preview-frame)').forEach(v=>v.dispatchEvent(new Event('qt-stop-video')));
                 for (const timer of videoViewTimers.values()) clearTimeout(timer);
                 videoViewTimers.clear();
             }
@@ -1480,7 +1521,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
           qtConversationRefresh=null;
           qtRefreshRequestBadge().catch(()=>{});
           document.getElementById('qt-social-panel').classList.remove('hidden');
-          document.querySelectorAll('#community-videos video').forEach(v=>v.dispatchEvent(new Event('qt-stop-video')));
+          document.querySelectorAll('#community-videos video:not(.qt-preview-frame)').forEach(v=>v.dispatchEvent(new Event('qt-stop-video')));
           qtSocialBody().replaceChildren();qtSocialMsg('');
           document.getElementById('qt-social-title').textContent=({me:'My Profile',user:'Member Profile',people:'Discover People',chats:'Qué tal Chat',chat:'Conversation',requests:'Message Requests'})[type]||'Qué tal';
           try {
