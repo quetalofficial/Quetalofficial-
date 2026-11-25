@@ -90,6 +90,9 @@
         #community-videos { height: min(76dvh, 790px); overflow-y: auto; scroll-snap-type: y mandatory; overscroll-behavior-y: contain; scrollbar-width: none; border-radius: 18px; }
         #community-videos::-webkit-scrollbar { display: none; }
         .qt-video-card { position: relative; height: 100%; min-height: 100%; scroll-snap-align: start; scroll-snap-stop: always; background: #000; overflow: hidden; }
+        .qt-tap-play { position:absolute; z-index:4; top:45%; left:50%; transform:translate(-50%,-50%); width:76px; height:76px; border-radius:50%; background:rgba(0,0,0,.68); border:2px solid rgba(255,255,255,.85); color:white; font-size:34px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+        .qt-tap-play.qt-playing { opacity:.12; }
+        .qt-tap-play.qt-playing:focus, .qt-tap-play.qt-playing:active { opacity:1; }
         .qt-video-card video { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; background: #000; }
         .qt-video-shade { position: absolute; inset: auto 0 0 0; height: 48%; pointer-events: none; background: linear-gradient(transparent, rgba(0,0,0,.85)); }
         .qt-video-info { position: absolute; bottom: 14px; left: 12px; right: 78px; text-shadow: 0 1px 4px #000; }
@@ -1162,14 +1165,54 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
                 article.dataset.caption = post.caption || '';
                 const player = el('video');
                 player.playsInline = true;
-                player.preload = 'metadata';
+                player.preload = 'none';
                 player.loop = true;
                 player.muted = true; // Mobile browsers allow muted autoplay; viewers can turn sound on.
                 player.controls = false;
                 player.setAttribute('aria-label', 'Video: ' + post.caption);
                 const {data: urlData} = sb.storage.from('videos').getPublicUrl(post.storage_path);
-                player.src = urlData.publicUrl;
-                player.addEventListener('click', () => player.paused ? player.play().catch(()=>{}) : player.pause());
+                // No network video request until the viewer explicitly presses Play.
+                player.dataset.videoUrl = urlData.publicUrl;
+                const playButton = el('button', 'qt-tap-play', '▶');
+                playButton.type = 'button';
+                playButton.setAttribute('aria-label', 'Play video');
+                const stopVideo = () => {
+                    player.pause();
+                    playButton.classList.remove('qt-playing');
+                    playButton.textContent = '▶';
+                    playButton.setAttribute('aria-label', 'Play video');
+                    // Release the media connection when the video is no longer selected.
+                    if (player.hasAttribute('src')) {
+                        player.removeAttribute('src');
+                        player.load();
+                    }
+                };
+                const toggleVideo = async () => {
+                    if (!player.paused) { stopVideo(); return; }
+                    document.querySelectorAll('#community-videos video').forEach(v => {
+                        if (v !== player) v.dispatchEvent(new Event('qt-stop-video'));
+                    });
+                    if (!player.hasAttribute('src')) player.src = player.dataset.videoUrl;
+                    try {
+                        await player.play();
+                        if (!countedVideosThisSession.has(post.id)) {
+                            const timer = setTimeout(() => {
+                                videoViewTimers.delete(post.id);
+                                if (!document.hidden && !player.paused && player.currentTime >= 2.5) {
+                                    recordVideoView(post.id, viewLabel);
+                                }
+                            }, 3000);
+                            videoViewTimers.set(post.id, timer);
+                        }
+                        playButton.classList.add('qt-playing');
+                        playButton.textContent = 'Ⅱ';
+                        playButton.setAttribute('aria-label', 'Pause video');
+                    } catch (_) { stopVideo(); }
+                };
+                player.addEventListener('qt-stop-video', stopVideo);
+                playButton.addEventListener('click', toggleVideo);
+                player.addEventListener('click', toggleVideo);
+                player.addEventListener('ended', stopVideo);
                 const shade = el('div','qt-video-shade');
                 const info = el('div','qt-video-info');
                 const creator = el('p','font-bold text-sm mb-1', post.user_id === activeUser.id ? '@You' : '@Creator ' + String(post.user_id).slice(0,6));
@@ -1303,7 +1346,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
                 follow.btn.querySelector('i').remove();
                 actions.addEventListener('touchmove', event => event.stopPropagation(), {passive:true});
                 actions.append(sound.btn,like.btn,comment.btn,share.btn);
-                article.append(player,shade,info,actions,follow.btn);
+                article.append(player,shade,playButton,info,actions,follow.btn);
                 feed.appendChild(article);
             }
             videoObserver = new IntersectionObserver(entries => {
@@ -1313,18 +1356,8 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
                     const postId = entry.target.dataset.postId;
                     if (videoViewTimers.has(postId)) { clearTimeout(videoViewTimers.get(postId)); videoViewTimers.delete(postId); }
                     if (entry.isIntersecting && entry.intersectionRatio >= .65 && !document.hidden) {
-                        video.play().catch(()=>{});
-                        if (!countedVideosThisSession.has(postId)) {
-                            const timer = setTimeout(() => {
-                                videoViewTimers.delete(postId);
-                                if (!document.hidden && !video.paused && video.currentTime >= 2.5) {
-                                    const label = entry.target.querySelector('.qt-video-views span');
-                                    if (label) recordVideoView(postId,label);
-                                }
-                            }, 3000);
-                            videoViewTimers.set(postId,timer);
-                        }
-                    } else video.pause();
+                        // Only user-initiated playback; never autoplay on scroll.
+                    } else video.dispatchEvent(new Event('qt-stop-video'));
                 }
             },{root:feed,threshold:[0,.65,1]});
             feed.querySelectorAll('.qt-video-card').forEach(card=>videoObserver.observe(card));
@@ -1333,7 +1366,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
         }
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) {
-                document.querySelectorAll('#community-videos video').forEach(v=>v.pause());
+                document.querySelectorAll('#community-videos video').forEach(v=>v.dispatchEvent(new Event('qt-stop-video')));
                 for (const timer of videoViewTimers.values()) clearTimeout(timer);
                 videoViewTimers.clear();
             }
@@ -1428,7 +1461,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
           qtConversationRefresh=null;
           qtRefreshRequestBadge().catch(()=>{});
           document.getElementById('qt-social-panel').classList.remove('hidden');
-          document.querySelectorAll('#community-videos video').forEach(v=>v.pause());
+          document.querySelectorAll('#community-videos video').forEach(v=>v.dispatchEvent(new Event('qt-stop-video')));
           qtSocialBody().replaceChildren();qtSocialMsg('');
           document.getElementById('qt-social-title').textContent=({me:'My Profile',user:'Member Profile',people:'Discover People',chats:'Qué tal Chat',chat:'Conversation',requests:'Message Requests'})[type]||'Qué tal';
           try {
