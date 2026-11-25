@@ -289,6 +289,25 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
 @media(max-width:380px) {body.qt-feed-active .qt-social-nav {gap:4px;}body.qt-feed-active .qt-social-nav button {font-size:12px;padding:6px 7px;}}
 
 
+
+/* Chat and People themes, without changing the video feed. */
+#qt-social-panel.qt-theme-neon{background:radial-gradient(circle at 85% 4%,#512078 0%,#170b2a 37%,#080611 85%);color:#fff}
+#qt-social-panel.qt-theme-light{background:#f7f5fb;color:#171123}
+#qt-social-panel.qt-theme-light .qt-social-card,#qt-social-panel.qt-theme-light .qt-chat-item{background:#fff;color:#171123;border-color:#ddd5e8}
+#qt-social-panel.qt-theme-light .qt-chat-messages{background:#eeeaf4}
+#qt-social-panel.qt-theme-light .qt-theirs .qt-message-bubble{background:#ded6eb;color:#171123}
+#qt-social-panel.qt-theme-light .qt-social-mini,#qt-social-panel.qt-theme-light .qt-chat-preview,#qt-social-panel.qt-theme-light .qt-chat-status{color:#625a70}
+#qt-social-panel.qt-theme-light input,#qt-social-panel.qt-theme-light textarea{background:#fff;color:#171123;border-color:#a69ab8}
+#qt-social-panel.qt-theme-light .qt-social-secondary{background:#ede8f4;color:#171123}
+#qt-social-panel.qt-theme-neon .qt-social-card,#qt-social-panel.qt-theme-neon .qt-chat-item{background:#21132f;border-color:#75429b}
+#qt-social-panel.qt-theme-neon .qt-chat-messages{background:#100a1c}
+#qt-social-panel.qt-theme-neon .qt-mine .qt-message-bubble{background:#9d00ff;color:#fff}
+.qt-theme-picker{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:2px 0 12px;font-size:12px}
+.qt-theme-picker select{background:#21132f;color:#fff;border:1px solid #a56ce1;border-radius:10px;padding:8px}
+.qt-online-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#24dc89;margin-right:5px}
+.qt-presence-line{font-size:12px;color:#c8b2e9}
+.qt-theme-light .qt-presence-line{color:#625a70}
+
 /* Qué Tal Chat upgrade: mobile-first conversations and message bubbles. */
 .qt-chat-list{display:grid;gap:10px;margin-top:12px}
 .qt-chat-item{width:100%;display:flex;align-items:center;gap:12px;text-align:left;background:#151521;border:1px solid #37374b;border-radius:16px;padding:12px;color:#fff;min-height:76px}
@@ -1471,6 +1490,59 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
         const qtSocialBody = () => document.getElementById('qt-social-body');
         const qtSocialMsg = (s='') => { document.getElementById('qt-social-message').textContent = s; };
         let qtCurrentPanel = null;
+        const qtThemeKey='qt-social-theme-v1';
+        const qtTheme=()=>{try{return localStorage.getItem(qtThemeKey)||'neon';}catch{return 'neon';}};
+        function qtApplyTheme(){
+          const panel=document.getElementById('qt-social-panel');
+          panel.classList.remove('qt-theme-neon','qt-theme-dark','qt-theme-light');
+          panel.classList.add('qt-theme-'+qtTheme());
+        }
+        function qtThemePicker(){
+          const wrap=el('label','qt-theme-picker','Background theme: ');
+          const select=el('select');select.setAttribute('aria-label','Chat and People background theme');
+          [['neon','Neon purple & black'],['dark','Dark'],['light','White']].forEach(([v,t])=>{const o=el('option','',t);o.value=v;select.append(o);});
+          select.value=qtTheme();select.onchange=()=>{try{localStorage.setItem(qtThemeKey,select.value);}catch{}qtApplyTheme();};
+          wrap.append(select);return wrap;
+        }
+        // Ephemeral Supabase Realtime presence and typing. Never claim a user is offline
+        // when presence cannot be established. No extra database table is required.
+        let qtLiveChannel=null,qtLiveOther=null,qtLiveTypingUntil=0;
+        let qtLiveTypingLabel=null,qtLivePresenceLabel=null,qtLiveTypingTimer=null;
+        function qtStopLive(){
+          if(qtLiveTypingTimer){clearTimeout(qtLiveTypingTimer);qtLiveTypingTimer=null;}
+          if(qtLiveChannel){try{sb.removeChannel(qtLiveChannel);}catch{}qtLiveChannel=null;}
+          qtLiveOther=null;qtLiveTypingLabel=null;qtLivePresenceLabel=null;
+        }
+        function qtLiveUpdate(){
+          if(!qtLiveChannel||!qtLivePresenceLabel||!qtLiveOther)return;
+          const state=qtLiveChannel.presenceState();
+          const online=Object.values(state).flat().some(x=>x.user_id===qtLiveOther);
+          qtLivePresenceLabel.textContent=online?'● Online now':'Last seen unavailable';
+          qtLivePresenceLabel.style.color=online?'#24dc89':'';
+        }
+        function qtStartLive(other,requestId,presenceLabel,typingLabel,refresh){
+          qtStopLive();
+          qtLiveOther=other;qtLivePresenceLabel=presenceLabel;qtLiveTypingLabel=typingLabel;
+          if(!sb?.channel)return;
+          const ch=sb.channel('qt-chat-live-'+requestId,{config:{presence:{key:activeUser.id},broadcast:{self:false}}});
+          qtLiveChannel=ch;
+          ch.on('presence',{event:'sync'},qtLiveUpdate)
+            .on('broadcast',{event:'typing'},({payload})=>{
+              if(payload?.user_id!==other||qtCurrentPanel?.uid!==other)return;
+              typingLabel.textContent=payload.typing?'Typing…':'';
+              if(qtLiveTypingTimer)clearTimeout(qtLiveTypingTimer);
+              if(payload.typing)qtLiveTypingTimer=setTimeout(()=>{typingLabel.textContent='';},3000);
+            })
+            .on('broadcast',{event:'message'},({payload})=>{if(payload?.user_id===other)refresh().catch(()=>{});})
+            .subscribe(async status=>{
+              if(status==='SUBSCRIBED'){try{await ch.track({user_id:activeUser.id,online_at:new Date().toISOString()});}catch{}}
+              if(status==='CHANNEL_ERROR'||status==='TIMED_OUT')presenceLabel.textContent='Online status unavailable';
+            });
+        }
+        function qtSendTyping(typing){
+          if(qtLiveChannel)qtLiveChannel.send({type:'broadcast',event:'typing',payload:{user_id:activeUser.id,typing}}).catch(()=>{});
+        }
+
         const qtProfileImage = p => p?.avatar_path ? sb.storage.from('quetal-avatars').getPublicUrl(p.avatar_path).data.publicUrl : '';
         const qtBtn = (text,fn,secondary=false) => {const b=el('button',secondary?'qt-social-secondary':'qt-social-btn',text);b.type='button';b.onclick=fn;return b;};
         const qtField = (label,value='',max=100,multiline=false) => {
@@ -1519,6 +1591,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
           if(!activeUser) return;
           qtCurrentPanel={type,uid};
           qtConversationRefresh=null;
+          qtStopLive();qtApplyTheme();
           qtRefreshRequestBadge().catch(()=>{});
           document.getElementById('qt-social-panel').classList.remove('hidden');
           document.querySelectorAll('#community-videos video:not(.qt-preview-frame)').forEach(v=>v.dispatchEvent(new Event('qt-stop-video')));
@@ -1533,7 +1606,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
             if(type==='requests') await qtShowRequests();
           } catch(e){qtSocialMsg('Member features are not configured yet: '+(e.message||e));}
         }
-        function qtClosePanel(){document.getElementById('qt-social-panel').classList.add('hidden');qtCurrentPanel=null;qtConversationRefresh=null;}
+        function qtClosePanel(){qtStopLive();document.getElementById('qt-social-panel').classList.add('hidden');qtCurrentPanel=null;qtConversationRefresh=null;}
         async function qtShowMyProfile(){
           const p=await qtReadProfile(activeUser.id)||{};
           const form=el('div','qt-social-card');
@@ -1610,7 +1683,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
             if(!data?.length){results.append(el('p','qt-social-mini','No matching profiles yet.'));return;}
             data.forEach(p=>{
               const c=el('div','qt-social-card');
-              c.append(el('strong','',p.display_name||'Member'),el('p','qt-social-mini',p.status||''),qtBtn('View profile',()=>qtOpenPanel('user',p.user_id)));
+              c.append(qtRow(qtAvatar(p,p.display_name||'Member'),el('strong','',p.display_name||'Member')),el('p','qt-social-mini',p.status||''),qtBtn('View profile',()=>qtOpenPanel('user',p.user_id)));
               results.append(c);
             });
           });
@@ -1639,7 +1712,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
             const side=el('div','qt-chat-side');side.append(el('span','qt-social-mini',qtWhen(e.last?.created_at)));if(e.unread)side.append(el('span','qt-chat-count',String(e.unread)));
             item.append(qtAvatar(e.p,name),info,side);list.append(item);
           });
-          body.replaceChildren(actions,list);
+          body.replaceChildren(qtThemePicker(),actions,list);
         }
         async function qtShowRequests(){
           const body=qtSocialBody();body.replaceChildren();
@@ -1665,9 +1738,9 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
           if(!req?.length){body.append(el('p','qt-social-mini','An accepted message request is needed before chatting.'));return;}
           const rId=req[0].id;
           const profile=await qtReadProfile(other);const name=profile?.display_name||'Member';
-          const box=el('div','qt-social-card');const header=el('div','qt-chat-header');header.append(qtAvatar(profile,name),el('strong','',name));
+          const box=el('div','qt-social-card');const header=el('div','qt-chat-header');const identity=el('div');identity.append(el('strong','',name));const presence=el('div','qt-presence-line','Checking online status…');identity.append(presence);header.append(qtAvatar(profile,name),identity);
           const list=el('div','qt-chat-messages');list.setAttribute('role','log');list.setAttribute('aria-label','Messages with '+name);
-          const status=el('p','qt-chat-status','Messages update automatically while this chat is open.');
+          const status=el('p','qt-chat-status','Messages update automatically while this chat is open.');const typing=el('p','qt-presence-line','');typing.setAttribute('aria-live','polite');
           let refreshing=false;let lastFingerprint='';
           const refresh=async()=>{
             if(refreshing||qtCurrentPanel?.type!=='chat'||qtCurrentPanel.uid!==other)return;
@@ -1694,18 +1767,18 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
             }finally{refreshing=false;}
           };
           qtConversationRefresh=refresh;
-          const input=qtField('Your message','',1000,true);input.wrap.classList.add('qt-chat-composer');
+          const input=qtField('Your message','',1000,true);input.wrap.classList.add('qt-chat-composer');let typingTimeout;input.field.addEventListener('input',()=>{qtSendTyping(true);clearTimeout(typingTimeout);typingTimeout=setTimeout(()=>qtSendTyping(false),1600);});
           const send=qtBtn('Send',async()=>{
             const message=input.field.value.trim();if(!message)return;
             send.disabled=true;
             try{
               const {error}=await sb.from('qt_messages').insert({request_id:rId,sender_id:activeUser.id,body:message});
               if(error){qtSocialMsg(error.message);return;}
-              input.field.value='';await refresh();
+              input.field.value='';qtSendTyping(false);if(qtLiveChannel)qtLiveChannel.send({type:'broadcast',event:'message',payload:{user_id:activeUser.id}}).catch(()=>{});await refresh();
             }finally{send.disabled=false;}
           });
-          box.append(header,list,status,input.wrap,qtRow(send,qtBtn('Refresh messages',refresh,true),qtBtn('View member',()=>qtOpenPanel('user',other),true),qtBtn('All chats',()=>qtOpenPanel('chats'),true)));
-          body.append(box);await refresh();
+          box.append(header,list,typing,status,input.wrap,qtRow(send,qtBtn('Refresh messages',refresh,true),qtBtn('View member',()=>qtOpenPanel('user',other),true),qtBtn('All chats',()=>qtOpenPanel('chats'),true)));
+          body.append(qtThemePicker(),box);qtStartLive(other,rId,presence,typing,refresh);await refresh();
         }
         function qtReportForm(type,target){
           const reason=qtField('Why are you reporting this member?','',500,true);
