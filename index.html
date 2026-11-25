@@ -283,6 +283,23 @@ body.qt-feed-active .qt-follow {bottom:max(44px,env(safe-area-inset-bottom));bac
 body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom));left:8px;}
 @media(max-width:380px) {body.qt-feed-active .qt-social-nav {gap:4px;}body.qt-feed-active .qt-social-nav button {font-size:12px;padding:6px 7px;}}
 
+
+/* Qué Tal Chat upgrade: mobile-first conversations and message bubbles. */
+.qt-chat-list{display:grid;gap:10px;margin-top:12px}
+.qt-chat-item{width:100%;display:flex;align-items:center;gap:12px;text-align:left;background:#151521;border:1px solid #37374b;border-radius:16px;padding:12px;color:#fff;min-height:76px}
+.qt-chat-item:focus-visible{outline:2px solid #22d3ee}
+.qt-chat-item.qt-unread{border-color:#22d3ee88;background:#19232c}
+.qt-chat-info{flex:1;min-width:0}.qt-chat-name{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qt-unread .qt-chat-name{font-weight:800}.qt-chat-preview{display:block;color:#a8a8bd;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:4px}
+.qt-chat-side{display:flex;flex-direction:column;align-items:end;gap:7px;flex-shrink:0}.qt-chat-count{display:inline-flex;min-width:23px;height:23px;padding:0 6px;border-radius:20px;background:#22d3ee;color:#050508;align-items:center;justify-content:center;font-size:12px;font-weight:800}
+.qt-chat-messages{display:flex;flex-direction:column;gap:10px;min-height:180px;max-height:54dvh;overflow-y:auto;padding:14px 8px;background:#0b0e18;border-radius:14px;overscroll-behavior:contain}
+.qt-message-row{display:flex;width:100%}.qt-message-row.qt-mine{justify-content:flex-end}.qt-message-row.qt-theirs{justify-content:flex-start}
+.qt-message-bubble{max-width:84%;min-width:70px;padding:10px 12px;border-radius:17px;overflow-wrap:anywhere;box-shadow:0 2px 8px #0004}
+.qt-mine .qt-message-bubble{background:#22d3ee;color:#061018;border-bottom-right-radius:4px}.qt-theirs .qt-message-bubble{background:#303241;color:#fff;border-bottom-left-radius:4px}
+.qt-message-text{font-size:14px;line-height:1.45;white-space:pre-wrap}.qt-message-time{font-size:10px;text-align:right;opacity:.75;margin-top:5px}
+.qt-chat-header{display:flex;align-items:center;gap:10px}.qt-chat-header strong{font-size:16px}.qt-chat-composer textarea{min-height:64px;resize:vertical}
+.qt-chat-status{font-size:11px;color:#a8a8bd}
+
 </style>
 </head>
 <body class="bg-darkbg text-white min-h-screen flex flex-col justify-between">
@@ -520,7 +537,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
             <nav class="qt-social-nav" aria-label="Qué tal member tools">
               <button type="button" onclick="qtOpenPanel('me')"><i class="fa-regular fa-user"></i> My Profile</button>
               <button type="button" onclick="qtOpenPanel('people')"><i class="fa-solid fa-magnifying-glass"></i> People</button>
-              <button type="button" onclick="qtOpenPanel('chats')"><i class="fa-regular fa-message"></i> Chat <span id="qt-request-badge" class="hidden" style="background:#ff3c65;color:white;border-radius:999px;padding:2px 6px;margin-left:3px;font-size:11px" aria-label="Pending message requests"></span></button>
+              <button type="button" onclick="qtOpenPanel('chats')"><i class="fa-regular fa-message"></i> Chat <span id="qt-unread-badge" class="hidden" style="background:#22d3ee;color:#050508;border-radius:999px;padding:2px 6px;margin-left:3px;font-size:11px" aria-label="Unread conversations"></span> <span id="qt-request-badge" class="hidden" style="background:#ff3c65;color:white;border-radius:999px;padding:2px 6px;margin-left:3px;font-size:11px" aria-label="Pending message requests"></span></button>
             </nav>
             <div class="qt-feed-top flex items-center justify-between gap-3">
                 <div><h2 class="text-xl font-extrabold text-glow-cyan">Qué tal Feed 🚀</h2>
@@ -1374,20 +1391,41 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
           const {data,error}=await sb.from('qt_profiles').select('user_id,display_name,bio,status,avatar_path').eq('user_id',uid).maybeSingle();
           if(error) throw error;return data;
         }
-        // Counts pending incoming requests, never total conversations or unread messages.
+        // Per-device read markers. These do not claim cross-device synchronization.
+        const qtReadKey = (rid) => 'qt-read-v1:' + (activeUser?.id||'') + ':' + rid;
+        const qtGetRead = (rid) => {try{return localStorage.getItem(qtReadKey(rid))||'';}catch{return '';}};
+        const qtSetRead = (rid,stamp) => {if(!stamp)return;try{localStorage.setItem(qtReadKey(rid),stamp);}catch{}};
+        const qtWhen = (date) => date ? new Date(date).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}) : '';
+        const qtAvatar = (p,label='Member') => {const img=el('img','qt-social-avatar');img.alt=label+' profile picture';img.style.width='46px';img.style.height='46px';if(qtProfileImage(p))img.src=qtProfileImage(p);img.onerror=()=>{img.removeAttribute('src');img.style.background='#353548';};return img;};
+        let qtBadgeBusy=false;
         async function qtRefreshRequestBadge(){
-          const badge=document.getElementById('qt-request-badge');
-          if(!badge)return;
-          if(!activeUser||!sb){badge.classList.add('hidden');return;}
-          const {count,error}=await sb.from('qt_message_requests').select('id',{count:'exact',head:true}).eq('recipient_id',activeUser.id).eq('status','pending');
-          if(error||!count){badge.classList.add('hidden');badge.textContent='';return;}
-          badge.textContent=String(count);badge.title=count+' pending message request'+(count===1?'':'s');badge.classList.remove('hidden');
+          if(qtBadgeBusy)return;qtBadgeBusy=true;
+          try{
+            const requestBadge=document.getElementById('qt-request-badge');
+            const unreadBadge=document.getElementById('qt-unread-badge');
+            if(!activeUser||!sb){requestBadge.classList.add('hidden');unreadBadge.classList.add('hidden');return;}
+            const {count,error}=await sb.from('qt_message_requests').select('id',{count:'exact',head:true}).eq('recipient_id',activeUser.id).eq('status','pending');
+            if(!error&&count){requestBadge.textContent=String(count);requestBadge.title=count+' pending message requests';requestBadge.classList.remove('hidden');}
+            else {requestBadge.classList.add('hidden');requestBadge.textContent='';}
+            const {data:convos,error:ce}=await sb.from('qt_message_requests').select('id').eq('status','accepted').or(`sender_id.eq.${activeUser.id},recipient_id.eq.${activeUser.id}`).limit(100);
+            if(ce)return;
+            let unreadConversations=0;
+            await Promise.all((convos||[]).map(async r=>{
+              const {data:messages,error:me}=await sb.from('qt_messages').select('sender_id,created_at').eq('request_id',r.id).order('created_at',{ascending:false}).limit(100);
+              if(me)return;
+              if((messages||[]).some(m=>m.sender_id!==activeUser.id && (!qtGetRead(r.id)||m.created_at>qtGetRead(r.id))))unreadConversations++;
+            }));
+            if(unreadConversations){unreadBadge.textContent=String(unreadConversations);unreadBadge.title=unreadConversations+' unread conversations';unreadBadge.classList.remove('hidden');}
+            else {unreadBadge.classList.add('hidden');unreadBadge.textContent='';}
+          }finally{qtBadgeBusy=false;}
         }
-        setInterval(()=>{if(activeUser)qtRefreshRequestBadge().catch(()=>{});},30000);
-        document.addEventListener('visibilitychange',()=>{if(!document.hidden&&activeUser)qtRefreshRequestBadge().catch(()=>{});});
+        setInterval(()=>{if(activeUser){qtRefreshRequestBadge().catch(()=>{});if(qtCurrentPanel?.type==='chat'&&qtConversationRefresh)qtConversationRefresh().catch(()=>{});if(qtCurrentPanel?.type==='chats')qtShowChats().catch(()=>{});if(qtCurrentPanel?.type==='requests')qtShowRequests().catch(()=>{});}},8000);
+        document.addEventListener('visibilitychange',()=>{if(!document.hidden&&activeUser){qtRefreshRequestBadge().catch(()=>{});if(qtCurrentPanel?.type==='chat'&&qtConversationRefresh)qtConversationRefresh().catch(()=>{});}});
+        let qtConversationRefresh=null;
         async function qtOpenPanel(type='me',uid=null) {
           if(!activeUser) return;
           qtCurrentPanel={type,uid};
+          qtConversationRefresh=null;
           qtRefreshRequestBadge().catch(()=>{});
           document.getElementById('qt-social-panel').classList.remove('hidden');
           document.querySelectorAll('#community-videos video').forEach(v=>v.pause());
@@ -1402,7 +1440,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
             if(type==='requests') await qtShowRequests();
           } catch(e){qtSocialMsg('Member features are not configured yet: '+(e.message||e));}
         }
-        function qtClosePanel(){document.getElementById('qt-social-panel').classList.add('hidden');qtCurrentPanel=null;}
+        function qtClosePanel(){document.getElementById('qt-social-panel').classList.add('hidden');qtCurrentPanel=null;qtConversationRefresh=null;}
         async function qtShowMyProfile(){
           const p=await qtReadProfile(activeUser.id)||{};
           const form=el('div','qt-social-card');
@@ -1486,12 +1524,29 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
           qtSocialBody().replaceChildren(search.wrap,find,results);
         }
         async function qtShowChats(){
-          const body=qtSocialBody();body.replaceChildren(qtRow(qtBtn('Message requests',()=>qtOpenPanel('requests')),qtBtn('Find people',()=>qtOpenPanel('people'),true)));
-          const {data,error}=await sb.from('qt_message_requests').select('id,sender_id,recipient_id,status').eq('status','accepted').or(`sender_id.eq.${activeUser.id},recipient_id.eq.${activeUser.id}`).limit(50);
+          if(qtCurrentPanel?.type!=='chats')return;
+          const body=qtSocialBody();
+          const {data,error}=await sb.from('qt_message_requests').select('id,sender_id,recipient_id,status').eq('status','accepted').or(`sender_id.eq.${activeUser.id},recipient_id.eq.${activeUser.id}`).limit(100);
           if(error)throw error;
-          if(!data?.length){body.append(el('p','qt-social-mini','No conversations yet. Search for a member and send a message request.'));return;}
-          for(const r of data){const other=r.sender_id===activeUser.id?r.recipient_id:r.sender_id;
-            const p=await qtReadProfile(other);body.append(qtBtn('Chat with '+(p?.display_name||'member'),()=>qtOpenPanel('chat',other),true));}
+          const entries=await Promise.all((data||[]).map(async r=>{
+            const other=r.sender_id===activeUser.id?r.recipient_id:r.sender_id;
+            const [p,result]=await Promise.all([qtReadProfile(other),sb.from('qt_messages').select('sender_id,body,created_at').eq('request_id',r.id).order('created_at',{ascending:false}).limit(100)]);
+            const messages=result.data||[];const last=messages[0];const marker=qtGetRead(r.id);
+            const unread=messages.filter(m=>m.sender_id!==activeUser.id&&(!marker||m.created_at>marker)).length;
+            return {other,p,last,unread};
+          }));
+          if(qtCurrentPanel?.type!=='chats')return;
+          entries.sort((a,b)=>(b.last?.created_at||'').localeCompare(a.last?.created_at||''));
+          const actions=qtRow(qtBtn('Message requests',()=>qtOpenPanel('requests')),qtBtn('Find people',()=>qtOpenPanel('people'),true));
+          const list=el('div','qt-chat-list');
+          if(!entries.length)list.append(el('p','qt-social-mini','No conversations yet. Search for a member and send a message request.'));
+          entries.forEach(e=>{
+            const name=e.p?.display_name||'Member';const item=el('button','qt-chat-item'+(e.unread?' qt-unread':''));item.type='button';item.onclick=()=>qtOpenPanel('chat',e.other);
+            const info=el('div','qt-chat-info');info.append(el('span','qt-chat-name',name),el('span','qt-chat-preview',e.last?(e.last.sender_id===activeUser.id?'You: ':'')+e.last.body:'Start your conversation'));
+            const side=el('div','qt-chat-side');side.append(el('span','qt-social-mini',qtWhen(e.last?.created_at)));if(e.unread)side.append(el('span','qt-chat-count',String(e.unread)));
+            item.append(qtAvatar(e.p,name),info,side);list.append(item);
+          });
+          body.replaceChildren(actions,list);
         }
         async function qtShowRequests(){
           const body=qtSocialBody();body.replaceChildren();
@@ -1516,19 +1571,47 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
           if(reqErr)throw reqErr;
           if(!req?.length){body.append(el('p','qt-social-mini','An accepted message request is needed before chatting.'));return;}
           const rId=req[0].id;
-          const box=el('div','qt-social-card');
-          const list=el('div','grid gap-2');
+          const profile=await qtReadProfile(other);const name=profile?.display_name||'Member';
+          const box=el('div','qt-social-card');const header=el('div','qt-chat-header');header.append(qtAvatar(profile,name),el('strong','',name));
+          const list=el('div','qt-chat-messages');list.setAttribute('role','log');list.setAttribute('aria-label','Messages with '+name);
+          const status=el('p','qt-chat-status','Messages update automatically while this chat is open.');
+          let refreshing=false;let lastFingerprint='';
           const refresh=async()=>{
-            const {data,error}=await sb.from('qt_messages').select('sender_id,body,created_at').eq('request_id',rId).order('created_at',{ascending:true}).limit(100);
-            if(error){qtSocialMsg(error.message);return;}
-            list.replaceChildren(...(data||[]).map(m=>el('p','text-sm break-words',`${m.sender_id===activeUser.id?'You':'Member'}: ${m.body}`)));
+            if(refreshing||qtCurrentPanel?.type!=='chat'||qtCurrentPanel.uid!==other)return;
+            refreshing=true;
+            try{
+              const {data,error}=await sb.from('qt_messages').select('sender_id,body,created_at').eq('request_id',rId).order('created_at',{ascending:true}).limit(100);
+              if(error){status.textContent='Could not refresh messages: '+error.message;return;}
+              const messages=data||[];const fingerprint=messages.length+'|'+(messages.at(-1)?.created_at||'')+'|'+(messages.at(-1)?.body||'');
+              if(fingerprint!==lastFingerprint){
+                const atBottom=list.scrollHeight-list.scrollTop-list.clientHeight<100;
+                list.replaceChildren();
+                if(!messages.length)list.append(el('p','qt-social-mini','No messages yet. Say hello!'));
+                messages.forEach(m=>{
+                  const mine=m.sender_id===activeUser.id;const row=el('div','qt-message-row '+(mine?'qt-mine':'qt-theirs'));
+                  const bubble=el('div','qt-message-bubble');bubble.append(el('div','qt-message-text',m.body),el('div','qt-message-time',qtWhen(m.created_at)));
+                  row.append(bubble);list.append(row);
+                });
+                if(atBottom||!lastFingerprint)list.scrollTop=list.scrollHeight;
+                lastFingerprint=fingerprint;
+              }
+              const lastIncoming=[...messages].reverse().find(m=>m.sender_id!==activeUser.id);
+              if(lastIncoming){qtSetRead(rId,lastIncoming.created_at);qtRefreshRequestBadge().catch(()=>{});}
+              status.textContent='Messages update automatically while this chat is open.';
+            }finally{refreshing=false;}
           };
-          const input=qtField('Your message','',1000,true);
-          box.append(list,input.wrap,qtRow(qtBtn('Send',async()=>{
-            const msg=input.field.value.trim();if(!msg)return;
-            const {error}=await sb.from('qt_messages').insert({request_id:rId,sender_id:activeUser.id,body:msg});
-            if(error)qtSocialMsg(error.message);else{input.field.value='';await refresh();}
-          }),qtBtn('Refresh messages',refresh,true),qtBtn('View member',()=>qtOpenPanel('user',other),true)));
+          qtConversationRefresh=refresh;
+          const input=qtField('Your message','',1000,true);input.wrap.classList.add('qt-chat-composer');
+          const send=qtBtn('Send',async()=>{
+            const message=input.field.value.trim();if(!message)return;
+            send.disabled=true;
+            try{
+              const {error}=await sb.from('qt_messages').insert({request_id:rId,sender_id:activeUser.id,body:message});
+              if(error){qtSocialMsg(error.message);return;}
+              input.field.value='';await refresh();
+            }finally{send.disabled=false;}
+          });
+          box.append(header,list,status,input.wrap,qtRow(send,qtBtn('Refresh messages',refresh,true),qtBtn('View member',()=>qtOpenPanel('user',other),true),qtBtn('All chats',()=>qtOpenPanel('chats'),true)));
           body.append(box);await refresh();
         }
         function qtReportForm(type,target){
