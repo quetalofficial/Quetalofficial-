@@ -324,6 +324,12 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
 .qt-chat-header{display:flex;align-items:center;gap:10px}.qt-chat-header strong{font-size:16px}.qt-chat-composer textarea{min-height:64px;resize:vertical}
 .qt-chat-status{font-size:11px;color:#a8a8bd}
 
+
+/* Nov 25 media and avatar upgrade */
+.qt-social-avatar.qt-letter-avatar{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;background:linear-gradient(135deg,#9d00ff,#5421a9);border:2px solid #d7a4ff;color:white;font-weight:800;font-size:22px;box-shadow:0 0 12px #9d00ff55}
+.qt-media-controls{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}.qt-media-controls button{background:#40205f;color:#fff;border:1px solid #ae6dea;border-radius:12px;padding:9px 12px;font-size:13px}
+.qt-media-preview{max-width:100%;max-height:290px;border-radius:12px}.qt-status-item{border-bottom:1px solid #75429b;padding:10px 0}.qt-status-item img{max-width:100%;max-height:300px;border-radius:12px}
+.qt-voice-indicator{font-size:12px;color:#e9c8ff}.qt-theme-light .qt-media-controls button{background:#eee2fa;color:#301149}
 </style>
 </head>
 <body class="bg-darkbg text-white min-h-screen flex flex-col justify-between">
@@ -580,6 +586,8 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
                     <label class="block text-sm">Choose a video from your phone
                         <input id="video-file" type="file" accept="video/mp4,video/webm,video/quicktime" required class="block mt-2 w-full text-xs text-zinc-300" onchange="previewSelectedVideo()">
                     </label>
+                    <div class="qt-media-controls"><button type="button" onclick="document.getElementById('qt-record-video').click()">🎥 Record video</button></div>
+                    <input id="qt-record-video" type="file" accept="video/*" capture="environment" hidden onchange="qtSelectRecordedVideo(this)">
                     <video id="video-preview" class="hidden w-full max-h-80 rounded-xl bg-black" controls playsinline preload="metadata"></video>
                     <label class="block text-sm">Caption
                         <textarea id="video-caption" maxlength="300" required rows="2" placeholder="Tell us about your video…" class="mt-2 w-full rounded-xl bg-zinc-900 border border-zinc-700 p-3 text-white text-sm"></textarea>
@@ -1561,7 +1569,14 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
         const qtGetRead = (rid) => {try{return localStorage.getItem(qtReadKey(rid))||'';}catch{return '';}};
         const qtSetRead = (rid,stamp) => {if(!stamp)return;try{localStorage.setItem(qtReadKey(rid),stamp);}catch{}};
         const qtWhen = (date) => date ? new Date(date).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}) : '';
-        const qtAvatar = (p,label='Member') => {const img=el('img','qt-social-avatar');img.alt=label+' profile picture';img.style.width='46px';img.style.height='46px';if(qtProfileImage(p))img.src=qtProfileImage(p);img.onerror=()=>{img.removeAttribute('src');img.style.background='#353548';};return img;};
+        const qtAvatar = (p,label='Member') => {
+          const wrap=el('span','qt-social-avatar qt-letter-avatar');wrap.style.width='46px';wrap.style.height='46px';
+          const letter=Array.from(String(label||'M').trim())[0]||'M';wrap.textContent=letter.toLocaleUpperCase();
+          wrap.setAttribute('role','img');wrap.setAttribute('aria-label',label+' profile picture');
+          const url=qtProfileImage(p);
+          if(url){const img=el('img','qt-social-avatar');img.alt='';img.style.width='100%';img.style.height='100%';img.style.borderRadius='50%';img.onload=()=>{wrap.textContent='';wrap.append(img);};img.onerror=()=>{};img.src=url;}
+          return wrap;
+        };
         let qtBadgeBusy=false;
         async function qtRefreshRequestBadge(){
           if(qtBadgeBusy)return;qtBadgeBusy=true;
@@ -1596,7 +1611,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
           document.getElementById('qt-social-panel').classList.remove('hidden');
           document.querySelectorAll('#community-videos video:not(.qt-preview-frame)').forEach(v=>v.dispatchEvent(new Event('qt-stop-video')));
           qtSocialBody().replaceChildren();qtSocialMsg('');
-          document.getElementById('qt-social-title').textContent=({me:'My Profile',user:'Member Profile',people:'Discover People',chats:'Qué tal Chat',chat:'Conversation',requests:'Message Requests'})[type]||'Qué tal';
+          document.getElementById('qt-social-title').textContent=({me:'My Profile',user:'Member Profile',people:'Discover People',chats:'Qué tal Chat',chat:'Conversation',requests:'Message Requests',statuses:'Status Updates'})[type]||'Qué tal';
           try {
             if(type==='me') await qtShowMyProfile();
             if(type==='user') await qtShowUserProfile(uid);
@@ -1604,6 +1619,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
             if(type==='chats') await qtShowChats();
             if(type==='chat') await qtShowConversation(uid);
             if(type==='requests') await qtShowRequests();
+            if(type==='statuses') await qtShowStatuses();
           } catch(e){qtSocialMsg('Member features are not configured yet: '+(e.message||e));}
         }
         function qtClosePanel(){qtStopLive();document.getElementById('qt-social-panel').classList.add('hidden');qtCurrentPanel=null;qtConversationRefresh=null;}
@@ -1611,15 +1627,17 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
           const p=await qtReadProfile(activeUser.id)||{};
           const form=el('div','qt-social-card');
           const head=el('div','flex items-center gap-3');
-          const avatar=el('img','qt-social-avatar');avatar.alt='Your profile picture';
-          if(qtProfileImage(p))avatar.src=qtProfileImage(p);
-          else avatar.setAttribute('aria-label','No profile picture uploaded');
+          const avatar=qtAvatar(p,p.display_name||activeUser.user_metadata?.username||'You');
           head.append(avatar,el('strong','',p.display_name||activeUser.user_metadata?.username||'Your profile'));
           const name=qtField('Display name',p.display_name||activeUser.user_metadata?.username||'',60);
           const bio=qtField('Biography (optional)',p.bio||'',240,true);
           const status=qtField('Current status (optional)',p.status||'',140,true);
           const fileLab=el('label','block text-sm','Profile picture (JPG, PNG or WebP, max 2 MB)');
           const file=el('input');file.type='file';file.accept='image/jpeg,image/png,image/webp';fileLab.append(file);
+          const photoCamera=el('input');photoCamera.type='file';photoCamera.accept='image/*';photoCamera.setAttribute('capture','environment');photoCamera.hidden=true;
+          const photoControls=qtRow(qtBtn('📸 Take photo',()=>photoCamera.click(),true),qtBtn('🖼️ Choose gallery',()=>file.click(),true));
+          photoCamera.onchange=()=>{if(photoCamera.files?.[0]){const dt=new DataTransfer();dt.items.add(photoCamera.files[0]);file.files=dt.files;qtSocialMsg('Photo selected. Tap Save profile.');}};
+
           const save=qtBtn('Save profile',async()=>{
             save.disabled=true;qtSocialMsg('Saving...');
             try {
@@ -1637,7 +1655,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
               qtSocialMsg('Profile saved!');await qtShowMyProfile();
             }catch(e){qtSocialMsg('Could not save: '+e.message);}finally{save.disabled=false;}
           });
-          form.append(head,name.wrap,bio.wrap,status.wrap,fileLab,save);
+          form.append(head,name.wrap,bio.wrap,status.wrap,fileLab,photoCamera,photoControls,save);
           const videos=el('div','qt-social-card');videos.append(el('h3','font-bold','My videos'));
           const {data,error}=await sb.from('video_posts').select('caption,created_at').eq('user_id',activeUser.id).order('created_at',{ascending:false}).limit(30);
           if(!error)videos.append(...(data?.length?data.map(v=>el('p','text-sm border-b border-zinc-700 py-2',v.caption)): [el('p','qt-social-mini','No uploaded videos yet.') ]));
@@ -1652,7 +1670,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
           const p=await qtReadProfile(uid);
           if(!p){qtSocialMsg('This member has not created a public profile yet.');return;}
           const card=el('div','qt-social-card');
-          const img=el('img','qt-social-avatar');img.alt='Member avatar';if(qtProfileImage(p))img.src=qtProfileImage(p);
+          const img=qtAvatar(p,p.display_name||'Member');
           card.append(qtRow(img,el('strong','',p.display_name||'Qué tal member')),
             el('p','text-sm',p.bio||'No biography yet.'),el('p','qt-social-mini','Status: '+(p.status||'No status')));
           const blocked=await qtBlocked(uid);
@@ -1708,7 +1726,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
           if(!entries.length)list.append(el('p','qt-social-mini','No conversations yet. Search for a member and send a message request.'));
           entries.forEach(e=>{
             const name=e.p?.display_name||'Member';const item=el('button','qt-chat-item'+(e.unread?' qt-unread':''));item.type='button';item.onclick=()=>qtOpenPanel('chat',e.other);
-            const info=el('div','qt-chat-info');info.append(el('span','qt-chat-name',name),el('span','qt-chat-preview',e.last?(e.last.sender_id===activeUser.id?'You: ':'')+e.last.body:'Start your conversation'));
+            const info=el('div','qt-chat-info');info.append(el('span','qt-chat-name',name),el('span','qt-chat-preview',e.last?(e.last.sender_id===activeUser.id?'You: ':'')+(e.last.body?.startsWith(qtMediaPrefix)?'📎 Attachment':e.last.body):'Start your conversation'));
             const side=el('div','qt-chat-side');side.append(el('span','qt-social-mini',qtWhen(e.last?.created_at)));if(e.unread)side.append(el('span','qt-chat-count',String(e.unread)));
             item.append(qtAvatar(e.p,name),info,side);list.append(item);
           });
@@ -1755,7 +1773,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
                 if(!messages.length)list.append(el('p','qt-social-mini','No messages yet. Say hello!'));
                 messages.forEach(m=>{
                   const mine=m.sender_id===activeUser.id;const row=el('div','qt-message-row '+(mine?'qt-mine':'qt-theirs'));
-                  const bubble=el('div','qt-message-bubble');bubble.append(el('div','qt-message-text',m.body),el('div','qt-message-time',qtWhen(m.created_at)));
+                  const bubble=el('div','qt-message-bubble');bubble.append(qtMediaNode(m.body),el('div','qt-message-time',qtWhen(m.created_at)));
                   row.append(bubble);list.append(row);
                 });
                 if(atBottom||!lastFingerprint)list.scrollTop=list.scrollHeight;
@@ -1777,8 +1795,102 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
               input.field.value='';qtSendTyping(false);if(qtLiveChannel)qtLiveChannel.send({type:'broadcast',event:'message',payload:{user_id:activeUser.id}}).catch(()=>{});await refresh();
             }finally{send.disabled=false;}
           });
-          box.append(header,list,typing,status,input.wrap,qtRow(send,qtBtn('Refresh messages',refresh,true),qtBtn('View member',()=>qtOpenPanel('user',other),true),qtBtn('All chats',()=>qtOpenPanel('chats'),true)));
+          const mediaControls=el('div','qt-media-controls');
+          const gallery=el('input');gallery.type='file';gallery.accept='image/jpeg,image/png,image/webp';gallery.hidden=true;
+          const camera=el('input');camera.type='file';camera.accept='image/*';camera.setAttribute('capture','environment');camera.hidden=true;
+          const video=el('input');video.type='file';video.accept='video/*';video.setAttribute('capture','environment');video.hidden=true;
+          const mediaStatus=el('p','qt-voice-indicator','');
+          const sendMedia=async(file,kind)=>{
+            mediaStatus.textContent='Uploading '+kind+'…';
+            try{
+              const info=await qtUploadMedia(file,kind);
+              const {error}=await sb.from('qt_messages').insert({request_id:rId,sender_id:activeUser.id,body:qtMediaPrefix+JSON.stringify(info)});
+              if(error)throw error;
+              mediaStatus.textContent='Sent!';if(qtLiveChannel)qtLiveChannel.send({type:'broadcast',event:'message',payload:{user_id:activeUser.id}}).catch(()=>{});await refresh();
+            }catch(e){mediaStatus.textContent='Could not send: '+e.message;}
+          };
+          gallery.onchange=()=>{if(gallery.files?.[0])sendMedia(gallery.files[0],'photo');};
+          camera.onchange=()=>{if(camera.files?.[0])sendMedia(camera.files[0],'photo');};
+          video.onchange=()=>{if(video.files?.[0])sendMedia(video.files[0],'video');};
+          const rec=qtBtn('🎤 Voice note',async()=>{
+            if(rec.dataset.recording==='true'){
+              if(rec._recorder?.state==='recording')rec._recorder.stop();return;
+            }
+            try{
+              if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder)throw Error('Microphone recording is not available in this browser.');
+              const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+              const chunks=[];const recorder=new MediaRecorder(stream);rec._recorder=recorder;rec.dataset.recording='true';rec.textContent='⏹ Stop recording';
+              recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
+              recorder.onstop=()=>{stream.getTracks().forEach(t=>t.stop());rec.dataset.recording='false';rec.textContent='🎤 Voice note';const blob=new Blob(chunks,{type:recorder.mimeType||'audio/webm'});if(blob.size)sendMedia(blob,'voice');};
+              recorder.start();mediaStatus.textContent='Recording… tap Stop when finished (max 60 seconds).';
+              setTimeout(()=>{if(recorder.state==='recording')recorder.stop();},60000);
+            }catch(e){rec.dataset.recording='false';rec.textContent='🎤 Voice note';mediaStatus.textContent=e.message;}
+          },true);
+          mediaControls.append(qtBtn('📸 Camera',()=>camera.click(),true),qtBtn('🖼️ Photo',()=>gallery.click(),true),qtBtn('🎥 Video',()=>video.click(),true),rec,gallery,camera,video);
+          box.append(header,list,typing,status,input.wrap,mediaControls,mediaStatus,qtRow(send,qtBtn('Refresh messages',refresh,true),qtBtn('View member',()=>qtOpenPanel('user',other),true),qtBtn('All chats',()=>qtOpenPanel('chats'),true)));
           body.append(qtThemePicker(),box);qtStartLive(other,rId,presence,typing,refresh);await refresh();
+        }
+        function qtSelectRecordedVideo(input){
+          const file=input.files?.[0],target=document.getElementById('video-file');if(!file||!target)return;
+          const dt=new DataTransfer();dt.items.add(file);target.files=dt.files;previewSelectedVideo();
+        }
+        const qtMediaPrefix='[QT_MEDIA_V1]';
+        async function qtUploadMedia(file,kind){
+          if(!activeUser)throw Error('Sign in first.');
+          const limits={photo:2*1024*1024,voice:3*1024*1024,video:15*1024*1024};
+          if(!file||file.size>limits[kind])throw Error(kind+' must be smaller than '+Math.round(limits[kind]/1048576)+' MB.');
+          if(kind==='photo'&&!['image/jpeg','image/png','image/webp'].includes(file.type))throw Error('Choose JPG, PNG or WebP.');
+          if(kind==='voice'&&!file.type.startsWith('audio/'))throw Error('Audio recording not supported on this device.');
+          const ext=kind==='photo'?(file.type==='image/png'?'png':file.type==='image/webp'?'webp':'jpg'):kind==='voice'?(file.type.includes('mp4')?'m4a':'webm'):'mp4';
+          const path=activeUser.id+'/'+crypto.randomUUID()+'.'+ext;
+          const {error}=await sb.storage.from('qt-media').upload(path,file,{contentType:file.type,upsert:false});if(error)throw error;
+          return {kind,path};
+        }
+        function qtMediaNode(body){
+          if(!body?.startsWith(qtMediaPrefix))return el('div','qt-message-text',body||'');
+          try{
+            const info=JSON.parse(body.slice(qtMediaPrefix.length));
+            if(!['photo','voice','video'].includes(info.kind)||typeof info.path!=='string'||!/^[-\w]+\/[\w.-]+$/.test(info.path))throw Error('Invalid media');
+            const url=sb.storage.from('qt-media').getPublicUrl(info.path).data.publicUrl;
+            if(info.kind==='photo'){const img=el('img','qt-media-preview');img.src=url;img.alt='Chat photo';img.loading='lazy';return img;}
+            const media=el(info.kind==='voice'?'audio':'video','qt-media-preview');media.src=url;media.controls=true;media.preload='none';if(info.kind==='video')media.playsInline=true;return media;
+          }catch{return el('div','qt-message-text','Attachment unavailable');}
+        }
+        async function qtShowStatuses(){
+          const body=qtSocialBody();body.replaceChildren();
+          const card=el('div','qt-social-card');card.append(el('h3','font-bold','Share a status'));
+          const words=qtField('What’s happening? (optional)','',140,true);
+          const photo=el('input');photo.type='file';photo.accept='image/jpeg,image/png,image/webp';photo.hidden=true;
+          const camera=el('input');camera.type='file';camera.accept='image/*';camera.setAttribute('capture','environment');camera.hidden=true;
+          const picked=el('p','qt-social-mini','Text or photo status • visible for 24 hours');
+          camera.onchange=()=>{if(camera.files?.[0]){const dt=new DataTransfer();dt.items.add(camera.files[0]);photo.files=dt.files;picked.textContent='Photo ready';}};
+          photo.onchange=()=>{picked.textContent=photo.files?.[0]?'Photo ready':'No photo selected';};
+          const publish=qtBtn('Post status',async()=>{
+            publish.disabled=true;qtSocialMsg('Posting status…');
+            try{
+              const text=words.field.value.trim();let media_path=null;
+              if(photo.files?.[0])media_path=(await qtUploadMedia(photo.files[0],'photo')).path;
+              if(!text&&!media_path)throw Error('Add some text or a photo.');
+              const {error}=await sb.from('qt_status_posts').insert({user_id:activeUser.id,body:text,media_path});if(error)throw error;
+              qtSocialMsg('Status posted!');await qtShowStatuses();
+            }catch(e){qtSocialMsg('Could not post: '+e.message);}finally{publish.disabled=false;}
+          });
+          card.append(words.wrap,photo,camera,qtRow(qtBtn('📸 Camera',()=>camera.click(),true),qtBtn('🖼️ Gallery',()=>photo.click(),true)),picked,publish);
+          const list=el('div','qt-social-card');list.append(el('h3','font-bold','Recent statuses'));
+          const since=new Date(Date.now()-86400000).toISOString();
+          const {data,error}=await sb.from('qt_status_posts').select('id,user_id,body,media_path,created_at').gte('created_at',since).order('created_at',{ascending:false}).limit(40);
+          if(error){list.append(el('p','qt-social-error','Status storage needs setup: '+error.message));}
+          else if(!data?.length)list.append(el('p','qt-social-mini','No statuses yet.'));
+          else for(const item of data){
+            const profile=await qtReadProfile(item.user_id).catch(()=>null);const entry=el('div','qt-status-item');
+            entry.append(qtRow(qtAvatar(profile,profile?.display_name||'Member'),el('strong','',profile?.display_name||'Member')));
+            if(item.body)entry.append(el('p','text-sm',item.body));
+            if(item.media_path){const im=el('img');im.loading='lazy';im.alt='Status photo';im.src=sb.storage.from('qt-media').getPublicUrl(item.media_path).data.publicUrl;entry.append(im);}
+            entry.append(el('p','qt-social-mini',new Date(item.created_at).toLocaleString()));
+            if(item.user_id===activeUser.id)entry.append(qtBtn('Delete',async()=>{const {error}=await sb.from('qt_status_posts').delete().eq('id',item.id).eq('user_id',activeUser.id);if(error)qtSocialMsg(error.message);else qtShowStatuses();},true));
+            list.append(entry);
+          }
+          body.append(card,list);
         }
         function qtReportForm(type,target){
           const reason=qtField('Why are you reporting this member?','',500,true);
