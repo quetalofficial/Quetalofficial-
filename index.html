@@ -520,7 +520,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
             <nav class="qt-social-nav" aria-label="Qué tal member tools">
               <button type="button" onclick="qtOpenPanel('me')"><i class="fa-regular fa-user"></i> My Profile</button>
               <button type="button" onclick="qtOpenPanel('people')"><i class="fa-solid fa-magnifying-glass"></i> People</button>
-              <button type="button" onclick="qtOpenPanel('chats')"><i class="fa-regular fa-message"></i> Chat</button>
+              <button type="button" onclick="qtOpenPanel('chats')"><i class="fa-regular fa-message"></i> Chat <span id="qt-request-badge" class="hidden" style="background:#ff3c65;color:white;border-radius:999px;padding:2px 6px;margin-left:3px;font-size:11px" aria-label="Pending message requests"></span></button>
             </nav>
             <div class="qt-feed-top flex items-center justify-between gap-3">
                 <div><h2 class="text-xl font-extrabold text-glow-cyan">Qué tal Feed 🚀</h2>
@@ -1374,9 +1374,21 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
           const {data,error}=await sb.from('qt_profiles').select('user_id,display_name,bio,status,avatar_path').eq('user_id',uid).maybeSingle();
           if(error) throw error;return data;
         }
+        // Counts pending incoming requests, never total conversations or unread messages.
+        async function qtRefreshRequestBadge(){
+          const badge=document.getElementById('qt-request-badge');
+          if(!badge)return;
+          if(!activeUser||!sb){badge.classList.add('hidden');return;}
+          const {count,error}=await sb.from('qt_message_requests').select('id',{count:'exact',head:true}).eq('recipient_id',activeUser.id).eq('status','pending');
+          if(error||!count){badge.classList.add('hidden');badge.textContent='';return;}
+          badge.textContent=String(count);badge.title=count+' pending message request'+(count===1?'':'s');badge.classList.remove('hidden');
+        }
+        setInterval(()=>{if(activeUser)qtRefreshRequestBadge().catch(()=>{});},30000);
+        document.addEventListener('visibilitychange',()=>{if(!document.hidden&&activeUser)qtRefreshRequestBadge().catch(()=>{});});
         async function qtOpenPanel(type='me',uid=null) {
           if(!activeUser) return;
           qtCurrentPanel={type,uid};
+          qtRefreshRequestBadge().catch(()=>{});
           document.getElementById('qt-social-panel').classList.remove('hidden');
           document.querySelectorAll('#community-videos video').forEach(v=>v.pause());
           qtSocialBody().replaceChildren();qtSocialMsg('');
@@ -1442,8 +1454,11 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
           const blocked=await qtBlocked(uid);
           const actions=qtRow();
           if(!blocked)actions.append(qtBtn('Message request',async()=>{
+            const {data:existing,error:lookupError}=await sb.from('qt_message_requests').select('status').eq('sender_id',activeUser.id).eq('recipient_id',uid).maybeSingle();
+            if(lookupError){qtSocialMsg('Could not check request: '+lookupError.message);return;}
+            if(existing){qtSocialMsg(existing.status==='pending'?'Your message request is already waiting for a reply.':existing.status==='accepted'?'Your request was accepted. Open Chat to message this member.':'This request was previously declined.');return;}
             const {error}=await sb.from('qt_message_requests').insert({sender_id:activeUser.id,recipient_id:uid});
-            qtSocialMsg(error?'Request not sent: '+error.message:'Message request sent. They must accept before you can chat.');
+            qtSocialMsg(error?(error.code==='23505'?'A request to this member already exists.':'Request not sent: '+error.message):'Message request sent. They must accept before you can chat.');
           }));
           actions.append(qtBtn(blocked?'Unblock member':'Block member',async()=>{
             const result=blocked?await sb.from('qt_blocks').delete().eq('blocker_id',activeUser.id).eq('blocked_id',uid):await sb.from('qt_blocks').insert({blocker_id:activeUser.id,blocked_id:uid});
@@ -1492,7 +1507,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
         }
         async function qtRespondRequest(id,status){
           const {error}=await sb.from('qt_message_requests').update({status}).eq('id',id).eq('recipient_id',activeUser.id);
-          if(error)qtSocialMsg(error.message);else qtOpenPanel('requests');
+          if(error)qtSocialMsg(error.message);else {await qtRefreshRequestBadge();qtOpenPanel('requests');}
         }
         async function qtShowConversation(other){
           const body=qtSocialBody();body.replaceChildren();
