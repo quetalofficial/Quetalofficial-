@@ -330,6 +330,15 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
 .qt-media-controls{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}.qt-media-controls button{background:#40205f;color:#fff;border:1px solid #ae6dea;border-radius:12px;padding:9px 12px;font-size:13px}
 .qt-media-preview{max-width:100%;max-height:290px;border-radius:12px}.qt-status-item{border-bottom:1px solid #75429b;padding:10px 0}.qt-status-item img{max-width:100%;max-height:300px;border-radius:12px}
 .qt-voice-indicator{font-size:12px;color:#e9c8ff}.qt-theme-light .qt-media-controls button{background:#eee2fa;color:#301149}
+
+.qt-conversation{padding:0!important;overflow:hidden!important;height:100dvh;bottom:auto}
+.qt-conversation .qt-social-inner{height:100%;display:flex;flex-direction:column;gap:0;max-width:650px}
+.qt-conversation .qt-social-inner>div:first-child{display:none}
+.qt-conversation #qt-social-body{flex:1;min-height:0;display:flex;flex-direction:column}
+.qt-chat-screen{display:flex;flex-direction:column;flex:1;min-height:0;padding:8px;gap:5px;padding-bottom:max(8px,env(safe-area-inset-bottom))}
+.qt-chat-screen .qt-chat-header{flex-shrink:0;padding:5px;gap:8px}.qt-chat-header>div:nth-last-child(2){flex:1}.qt-chat-header .qt-social-avatar{width:40px;height:40px}
+.qt-chat-screen .qt-chat-messages{flex:1;min-height:0;max-height:none;border-radius:0}.qt-chat-screen .qt-chat-status{display:none}
+.qt-composer,.qt-pill{display:flex;align-items:flex-end;gap:3px}.qt-pill{flex:1;min-width:0;background:#302438;border-radius:26px;padding:3px 5px;align-items:center}.qt-pill textarea{flex:1;min-width:0;width:0!important;background:transparent!important;border:0!important;resize:none;padding:8px 2px!important;font-size:16px!important;max-height:120px;outline:none}.qt-icon{width:36px;height:42px;flex-shrink:0;color:inherit;font-size:19px;background:transparent;border:0}.qt-icon[hidden]{display:none}.qt-send{background:#22d3ee;color:#050508;border-radius:50%;width:46px;height:46px;touch-action:none}.qt-tray{max-height:35dvh;overflow:auto;display:flex;flex-wrap:wrap;gap:6px;padding:8px;background:#21132f;border-radius:14px}.qt-tray.hidden{display:none}.qt-tray .qt-media-preview{max-height:22dvh}.qt-theme-light .qt-pill,.qt-theme-light .qt-tray{background:#e5ddef}.qt-chat-screen .qt-voice-indicator:empty{display:none}
 </style>
 </head>
 <body class="bg-darkbg text-white min-h-screen flex flex-col justify-between">
@@ -619,7 +628,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
     <!-- Separate post-login overlay. No changes to registration, installation or onboarding. -->
     <section id="qt-social-panel" class="qt-social-panel hidden" aria-label="Member profiles and messages" role="dialog" aria-modal="true">
       <div class="qt-social-inner">
-        <div class="flex justify-between items-center gap-2"><h2 class="text-xl font-bold text-cyan-300" id="qt-social-title">Qué tal</h2><button class="qt-social-secondary" type="button" onclick="qtClosePanel()">✕ Back to videos</button></div>
+        <div class="flex justify-between items-center gap-2"><h2 class="text-xl font-bold text-cyan-300" id="qt-social-title">Qué tal</h2><button class="qt-social-secondary" type="button" onclick="qtBack()">← Back</button></div>
         <p class="qt-social-error" id="qt-social-message" role="status" aria-live="polite"></p>
         <div id="qt-social-body"></div>
       </div>
@@ -1601,9 +1610,14 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
         }
         setInterval(()=>{if(activeUser){qtRefreshRequestBadge().catch(()=>{});if(qtCurrentPanel?.type==='chat'&&qtConversationRefresh)qtConversationRefresh().catch(()=>{});if(qtCurrentPanel?.type==='chats')qtShowChats().catch(()=>{});if(qtCurrentPanel?.type==='requests')qtShowRequests().catch(()=>{});}},8000);
         document.addEventListener('visibilitychange',()=>{if(!document.hidden&&activeUser){qtRefreshRequestBadge().catch(()=>{});if(qtCurrentPanel?.type==='chat'&&qtConversationRefresh)qtConversationRefresh().catch(()=>{});}});
-        let qtConversationRefresh=null;
-        async function qtOpenPanel(type='me',uid=null) {
+        let qtConversationRefresh=null, qtChatCleanup=null;
+        function qtBack(){if(history.state?.qtPanel)history.back();else qtClosePanel();}
+        window.addEventListener('popstate',e=>{if(e.state?.qtPanel)qtOpenPanel(e.state.qtPanel.type,e.state.qtPanel.uid,true);else qtClosePanel();});
+        async function qtOpenPanel(type='me',uid=null,fromHistory=false) {
           if(!activeUser) return;
+          if(qtChatCleanup){qtChatCleanup();qtChatCleanup=null;}
+          if(!fromHistory && (qtCurrentPanel?.type!==type||qtCurrentPanel?.uid!==uid))history.pushState({qtPanel:{type,uid}},'');
+          document.getElementById('qt-social-panel').classList.toggle('qt-conversation',type==='chat');
           qtCurrentPanel={type,uid};
           qtConversationRefresh=null;
           qtStopLive();qtApplyTheme();
@@ -1622,7 +1636,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
             if(type==='statuses') await qtShowStatuses();
           } catch(e){qtSocialMsg('Member features are not configured yet: '+(e.message||e));}
         }
-        function qtClosePanel(){qtStopLive();document.getElementById('qt-social-panel').classList.add('hidden');qtCurrentPanel=null;qtConversationRefresh=null;}
+        function qtClosePanel(){if(qtChatCleanup){qtChatCleanup();qtChatCleanup=null;}qtStopLive();document.getElementById('qt-social-panel').classList.add('hidden');qtCurrentPanel=null;qtConversationRefresh=null;}
         async function qtShowMyProfile(){
           const p=await qtReadProfile(activeUser.id)||{};
           const form=el('div','qt-social-card');
@@ -1756,7 +1770,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
           if(!req?.length){body.append(el('p','qt-social-mini','An accepted message request is needed before chatting.'));return;}
           const rId=req[0].id;
           const profile=await qtReadProfile(other);const name=profile?.display_name||'Member';
-          const box=el('div','qt-social-card');const header=el('div','qt-chat-header');const identity=el('div');identity.append(el('strong','',name));const presence=el('div','qt-presence-line','Checking online status…');identity.append(presence);header.append(qtAvatar(profile,name),identity);
+          const box=el('div','qt-chat-screen');const header=el('div','qt-chat-header');const identity=el('div');identity.append(el('strong','',name));const presence=el('div','qt-presence-line','Checking online status…');identity.append(presence);header.append(qtAvatar(profile,name),identity);
           const list=el('div','qt-chat-messages');list.setAttribute('role','log');list.setAttribute('aria-label','Messages with '+name);
           const status=el('p','qt-chat-status','Messages update automatically while this chat is open.');const typing=el('p','qt-presence-line','');typing.setAttribute('aria-live','polite');
           let refreshing=false;let lastFingerprint='';
@@ -1764,16 +1778,18 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
             if(refreshing||qtCurrentPanel?.type!=='chat'||qtCurrentPanel.uid!==other)return;
             refreshing=true;
             try{
-              const {data,error}=await sb.from('qt_messages').select('sender_id,body,created_at').eq('request_id',rId).order('created_at',{ascending:true}).limit(100);
+              const {data,error}=await sb.from('qt_messages').select('id,sender_id,body,created_at').eq('request_id',rId).order('created_at',{ascending:true}).limit(100);
               if(error){status.textContent='Could not refresh messages: '+error.message;return;}
-              const messages=data||[];const fingerprint=messages.length+'|'+(messages.at(-1)?.created_at||'')+'|'+(messages.at(-1)?.body||'');
+              const messages=data||[];const fingerprint=JSON.stringify(messages);
               if(fingerprint!==lastFingerprint){
                 const atBottom=list.scrollHeight-list.scrollTop-list.clientHeight<100;
                 list.replaceChildren();
                 if(!messages.length)list.append(el('p','qt-social-mini','No messages yet. Say hello!'));
                 messages.forEach(m=>{
+                  if(localStorage.getItem('qt-hidden:'+activeUser.id+':'+m.id))return;
                   const mine=m.sender_id===activeUser.id;const row=el('div','qt-message-row '+(mine?'qt-mine':'qt-theirs'));
-                  const bubble=el('div','qt-message-bubble');bubble.append(qtMediaNode(m.body),el('div','qt-message-time',qtWhen(m.created_at)));
+                  const bubble=el('div','qt-message-bubble');bubble.append(qtMediaNode(m.body));if(m.body?.startsWith(qtMediaPrefix)){try{const c=JSON.parse(m.body.slice(qtMediaPrefix.length)).caption;if(c)bubble.append(el('div','qt-message-text',c));}catch{}}bubble.append(el('div','qt-message-time',qtWhen(m.created_at)));
+                  let hold; bubble.onpointerdown=()=>{hold=setTimeout(()=>selectMessage(m,bubble),450);};bubble.onpointerup=bubble.onpointercancel=bubble.onpointermove=()=>clearTimeout(hold);bubble.oncontextmenu=e=>{e.preventDefault();selectMessage(m,bubble);};
                   row.append(bubble);list.append(row);
                 });
                 if(atBottom||!lastFingerprint)list.scrollTop=list.scrollHeight;
@@ -1785,51 +1801,28 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
             }finally{refreshing=false;}
           };
           qtConversationRefresh=refresh;
-          const input=qtField('Your message','',1000,true);input.wrap.classList.add('qt-chat-composer');let typingTimeout;input.field.addEventListener('input',()=>{qtSendTyping(true);clearTimeout(typingTimeout);typingTimeout=setTimeout(()=>qtSendTyping(false),1600);});
-          const send=qtBtn('Send',async()=>{
-            const message=input.field.value.trim();if(!message)return;
-            send.disabled=true;
-            try{
-              const {error}=await sb.from('qt_messages').insert({request_id:rId,sender_id:activeUser.id,body:message});
-              if(error){qtSocialMsg(error.message);return;}
-              input.field.value='';qtSendTyping(false);if(qtLiveChannel)qtLiveChannel.send({type:'broadcast',event:'message',payload:{user_id:activeUser.id}}).catch(()=>{});await refresh();
-            }finally{send.disabled=false;}
-          });
-          const mediaControls=el('div','qt-media-controls');
-          const gallery=el('input');gallery.type='file';gallery.accept='image/jpeg,image/png,image/webp';gallery.hidden=true;
-          const camera=el('input');camera.type='file';camera.accept='image/*';camera.setAttribute('capture','environment');camera.hidden=true;
-          const video=el('input');video.type='file';video.accept='video/*';video.setAttribute('capture','environment');video.hidden=true;
-          const mediaStatus=el('p','qt-voice-indicator','');
-          const sendMedia=async(file,kind)=>{
-            mediaStatus.textContent='Uploading '+kind+'…';
-            try{
-              const info=await qtUploadMedia(file,kind);
-              const {error}=await sb.from('qt_messages').insert({request_id:rId,sender_id:activeUser.id,body:qtMediaPrefix+JSON.stringify(info)});
-              if(error)throw error;
-              mediaStatus.textContent='Sent!';if(qtLiveChannel)qtLiveChannel.send({type:'broadcast',event:'message',payload:{user_id:activeUser.id}}).catch(()=>{});await refresh();
-            }catch(e){mediaStatus.textContent='Could not send: '+e.message;}
-          };
-          gallery.onchange=()=>{if(gallery.files?.[0])sendMedia(gallery.files[0],'photo');};
-          camera.onchange=()=>{if(camera.files?.[0])sendMedia(camera.files[0],'photo');};
-          video.onchange=()=>{if(video.files?.[0])sendMedia(video.files[0],'video');};
-          const rec=qtBtn('🎤 Voice note',async()=>{
-            if(rec.dataset.recording==='true'){
-              if(rec._recorder?.state==='recording')rec._recorder.stop();return;
-            }
-            try{
-              if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder)throw Error('Microphone recording is not available in this browser.');
-              const stream=await navigator.mediaDevices.getUserMedia({audio:true});
-              const chunks=[];const recorder=new MediaRecorder(stream);rec._recorder=recorder;rec.dataset.recording='true';rec.textContent='⏹ Stop recording';
-              recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
-              recorder.onstop=()=>{stream.getTracks().forEach(t=>t.stop());rec.dataset.recording='false';rec.textContent='🎤 Voice note';const blob=new Blob(chunks,{type:recorder.mimeType||'audio/webm'});if(blob.size)sendMedia(blob,'voice');};
-              recorder.start();mediaStatus.textContent='Recording… tap Stop when finished (max 60 seconds).';
-              setTimeout(()=>{if(recorder.state==='recording')recorder.stop();},60000);
-            }catch(e){rec.dataset.recording='false';rec.textContent='🎤 Voice note';mediaStatus.textContent=e.message;}
-          },true);
-          mediaControls.append(qtBtn('📸 Camera',()=>camera.click(),true),qtBtn('🖼️ Photo',()=>gallery.click(),true),qtBtn('🎥 Video',()=>video.click(),true),rec,gallery,camera,video);
-          box.append(header,list,typing,status,input.wrap,mediaControls,mediaStatus,qtRow(send,qtBtn('Refresh messages',refresh,true),qtBtn('View member',()=>qtOpenPanel('user',other),true),qtBtn('All chats',()=>qtOpenPanel('chats'),true)));
-          body.append(qtThemePicker(),box);qtStartLive(other,rId,presence,typing,refresh);await refresh();
+          const icon=(name,label,fn)=>{const b=el('button','qt-icon');b.type='button';b.setAttribute('aria-label',label);b.title=label;const i=el('i','fa-solid fa-'+name);b.append(i);b.onclick=fn;return b;};
+          const input=el('textarea');input.rows=1;input.placeholder='Message';input.maxLength=10000;
+          const mediaStatus=el('p','qt-voice-indicator');const tray=el('div','qt-tray hidden');
+          const notify=()=>{if(qtLiveChannel)qtLiveChannel.send({type:'broadcast',event:'message',payload:{user_id:activeUser.id}}).catch(()=>{});};
+          const post=async(message,target=rId)=>{const {error}=await sb.from('qt_messages').insert({request_id:target,sender_id:activeUser.id,body:message});if(error)throw error;notify();await refresh();};
+          let busy=false, recorder=null, stream=null, cancelled=false, alive=true, timer=null, started=0, pending=false, held=false, releasePending=false;
+          const send=icon('microphone','Record voice note',async()=>{if(busy||pending)return;if(recorder?.state==='recording'){recorder.stop();return;}if(input.value.trim()){busy=true;try{await post(input.value.trim());input.value='';update();}catch(e){mediaStatus.textContent=e.message;}finally{busy=false;}return;}await record();});send.classList.add('qt-send');
+          const cameraButton=icon('camera','Camera',()=>showTray('camera'));
+          const update=()=>{input.style.height='auto';input.style.height=Math.min(input.scrollHeight,120)+'px';const sending=!!input.value.trim()||recorder?.state==='recording';send.firstChild.className='fa-solid fa-'+(sending?'paper-plane':'microphone');send.setAttribute('aria-label',sending?'Send':'Record voice note');cameraButton.hidden=!!input.value.trim();};
+          let typingTimeout;input.oninput=()=>{update();qtSendTyping(true);clearTimeout(typingTimeout);typingTimeout=setTimeout(()=>qtSendTyping(false),1600);};
+          const sendMedia=async(file,kind,caption='')=>{mediaStatus.textContent='Uploading '+kind+'…';try{const info=await qtUploadMedia(file,kind);if(!alive)return;await post(qtMediaPrefix+JSON.stringify({...info,caption}));mediaStatus.textContent='Sent';}catch(e){mediaStatus.textContent='Could not send: '+e.message;}};
+          const record=async()=>{if(pending||recorder?.state==='recording')return;pending=true;cancelled=false;try{stream=await navigator.mediaDevices.getUserMedia({audio:true});if(!alive){stream.getTracks().forEach(t=>t.stop());return;}const chunks=[];recorder=new MediaRecorder(stream);recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};recorder.onstop=async()=>{clearInterval(timer);stream.getTracks().forEach(t=>t.stop());const blob=new Blob(chunks,{type:recorder.mimeType||'audio/webm'});recorder=null;update();if(!cancelled&&alive&&blob.size)await sendMedia(blob,'voice');else mediaStatus.textContent='Recording cancelled';};recorder.start();started=Date.now();update();tray.classList.remove('hidden');tray.replaceChildren(qtBtn('Cancel recording',()=>{cancelled=true;recorder?.stop();tray.classList.add('hidden');},true));timer=setInterval(()=>{mediaStatus.textContent='● Recording '+Math.floor((Date.now()-started)/1000)+'s';if(Date.now()-started>=60000)recorder?.stop();},250);if(releasePending){releasePending=false;recorder.stop();}}catch(e){stream?.getTracks().forEach(t=>t.stop());mediaStatus.textContent=e.message;}finally{pending=false;}};
+          let pressTimer, suppress=false;send.onpointerdown=e=>{if(input.value.trim()||recorder||pending)return;held=false;releasePending=false;send.setPointerCapture(e.pointerId);pressTimer=setTimeout(()=>{held=true;record();},350);};send.onpointerup=()=>{clearTimeout(pressTimer);if(held){suppress=true;if(recorder?.state==='recording')recorder.stop();else releasePending=true;}};send.onpointercancel=()=>{clearTimeout(pressTimer);if(held){cancelled=true;recorder?.stop();}};const click=send.onclick;send.onclick=()=>{if(suppress){suppress=false;return;}click();};
+          const picker=(accept,capture,kind)=>{const f=el('input');f.type='file';f.accept=accept;if(capture)f.setAttribute('capture','environment');f.onchange=()=>{const file=f.files?.[0];if(!file)return;preview(file,kind|| (file.type.startsWith('video/')?'video':'photo'));};f.click();};
+          let previewUrl;const preview=(file,kind)=>{if(previewUrl)URL.revokeObjectURL(previewUrl);previewUrl=URL.createObjectURL(file);tray.replaceChildren();tray.classList.remove('hidden');const v=el(kind==='photo'?'img':kind==='video'?'video':'audio','qt-media-preview');v.src=previewUrl;v.controls=true;const cap=el('input');cap.placeholder='Add a caption…';tray.append(v,cap,qtBtn('Send',async()=>{tray.classList.add('hidden');await sendMedia(file,kind,cap.value);}),qtBtn('Cancel',()=>tray.classList.add('hidden'),true));};
+          const showTray=mode=>{tray.replaceChildren();tray.classList.toggle('hidden',false);if(mode==='emoji'){for(const e of Array.from('😀😃😄😁😂🤣😊😍😘🥰😉😎😢😭😡👍👏🙏🔥🎉💕💜🌹'))tray.append(qtBtn(e,()=>{input.setRangeText(e,input.selectionStart,input.selectionEnd,'end');input.focus();update();},true));return;}tray.append(qtBtn('Photo',()=>picker('image/*',true,'photo'),true),qtBtn('Video',()=>picker('video/*',true,'video'),true),qtBtn('Gallery ↑',()=>picker('image/*,video/*',false),true));if(mode!=='camera')tray.append(qtBtn('Audio',()=>picker('audio/*',false,'voice'),true),qtBtn('Location',()=>navigator.geolocation.getCurrentPosition(async p=>{try{await post('https://maps.google.com/?q='+p.coords.latitude+','+p.coords.longitude);tray.classList.add('hidden');}catch(e){mediaStatus.textContent=e.message;}},e=>mediaStatus.textContent=e.message),true));};
+          const menu=()=>{tray.replaceChildren();tray.classList.remove('hidden');tray.append(qtBtn('View profile',()=>qtOpenPanel('user',other),true),qtBtn('Search messages',()=>{const q=prompt('Search messages');if(q)Array.from(list.children).find(n=>n.textContent.toLowerCase().includes(q.toLowerCase()))?.scrollIntoView();},true),qtBtn('Block / unblock member',()=>qtOpenPanel('user',other),true),qtBtn('Report member',()=>qtOpenPanel('user',other),true),qtBtn('Refresh messages',refresh,true),qtBtn('Close menu',()=>tray.classList.add('hidden'),true));};
+          const normalHeader=()=>header.replaceChildren(icon('arrow-left','All chats',qtBack),qtAvatar(profile,name),identity,icon('ellipsis-vertical','More options',menu));normalHeader();
+          const selectMessage=(m,bubble)=>{header.replaceChildren(icon('arrow-left','Cancel selection',normalHeader),el('strong','','1'),icon('copy','Copy',async()=>{try{await navigator.clipboard.writeText(m.body);normalHeader();}catch(e){mediaStatus.textContent=e.message;}}),icon('share','Forward',async()=>{const {data,error}=await sb.from('qt_message_requests').select('id,sender_id,recipient_id').eq('status','accepted').or(`sender_id.eq.${activeUser.id},recipient_id.eq.${activeUser.id}`);if(error){mediaStatus.textContent=error.message;return;}tray.replaceChildren(el('strong','','Forward to'));tray.classList.remove('hidden');for(const r of data||[]){const p=await qtReadProfile(r.sender_id===activeUser.id?r.recipient_id:r.sender_id);tray.append(qtBtn(p?.display_name||'Member',async()=>{try{await post(m.body,r.id);tray.classList.add('hidden');normalHeader();mediaStatus.textContent='Forwarded';}catch(e){mediaStatus.textContent=e.message;}},true));}}),icon('trash','Delete',()=>{tray.replaceChildren();tray.classList.remove('hidden');tray.append(qtBtn('Delete for me (this device)',()=>{localStorage.setItem('qt-hidden:'+activeUser.id+':'+m.id,'1');bubble.parentElement.remove();normalHeader();tray.classList.add('hidden');},true));if(m.sender_id===activeUser.id)tray.append(qtBtn('Delete for everyone',async()=>{if(!confirm('Delete this message for everyone?'))return;const {data,error}=await sb.from('qt_messages').update({body:'This message was deleted.'}).eq('id',m.id).eq('sender_id',activeUser.id).select('id');if(error||!data?.length){mediaStatus.textContent=error?.message||'Server does not permit deletion.';return;}notify();await refresh();normalHeader();tray.classList.add('hidden');},true));}));};
+          const pill=el('div','qt-pill');pill.append(icon('face-smile','Emoji',()=>showTray('emoji')),input,icon('paperclip','Attachments',()=>showTray('attachments')),cameraButton);const composer=el('div','qt-composer');composer.append(pill,send);box.append(header,list,typing,status,tray,mediaStatus,composer);body.append(box);qtStartLive(other,rId,presence,typing,refresh);qtChatCleanup=()=>{alive=false;cancelled=true;clearInterval(timer);clearTimeout(typingTimeout);if(recorder?.state==='recording')recorder.stop();stream?.getTracks().forEach(t=>t.stop());if(previewUrl)URL.revokeObjectURL(previewUrl);};await refresh();
         }
+        if(window.visualViewport){const fit=()=>{const p=document.getElementById('qt-social-panel');p.style.height=p.classList.contains('qt-conversation')?visualViewport.height+'px':'';};visualViewport.addEventListener('resize',fit);new MutationObserver(fit).observe(document.getElementById('qt-social-panel'),{attributes:true,attributeFilter:['class']});}
         function qtSelectRecordedVideo(input){
           const file=input.files?.[0],target=document.getElementById('video-file');if(!file||!target)return;
           const dt=new DataTransfer();dt.items.add(file);target.files=dt.files;previewSelectedVideo();
@@ -1847,7 +1840,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
           return {kind,path};
         }
         function qtMediaNode(body){
-          if(!body?.startsWith(qtMediaPrefix))return el('div','qt-message-text',body||'');
+          if(!body?.startsWith(qtMediaPrefix)){const d=el('div','qt-message-text',body||'');if(body?.length>500){d.textContent=body.slice(0,500)+'…';d.append(qtBtn('Read more',()=>{d.textContent=body;},true));}return d;}
           try{
             const info=JSON.parse(body.slice(qtMediaPrefix.length));
             if(!['photo','voice','video'].includes(info.kind)||typeof info.path!=='string'||!/^[-\w]+\/[\w.-]+$/.test(info.path))throw Error('Invalid media');
