@@ -325,6 +325,10 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
 .qt-chat-status{font-size:11px;color:#a8a8bd}
 
 
+/* Chat selection and location cards */
+.qt-message-bubble,.qt-message-bubble *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.qt-message-bubble.qt-selected{outline:3px solid #22d3ee;outline-offset:2px}
+.qt-location-card{display:grid;gap:8px;width:min(240px,65vw);color:inherit;text-decoration:none}.qt-location-card iframe{width:100%;height:145px;border:0;border-radius:10px;pointer-events:none}.qt-location-card a{color:inherit;text-decoration:underline;font-weight:700}
 /* Nov 25 media and avatar upgrade */
 .qt-social-avatar.qt-letter-avatar{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;background:linear-gradient(135deg,#9d00ff,#5421a9);border:2px solid #d7a4ff;color:white;font-weight:800;font-size:22px;box-shadow:0 0 12px #9d00ff55}
 .qt-media-controls{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}.qt-media-controls button{background:#40205f;color:#fff;border:1px solid #ae6dea;border-radius:12px;padding:9px 12px;font-size:13px}
@@ -1524,17 +1528,21 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
         // Ephemeral Supabase Realtime presence and typing. Never claim a user is offline
         // when presence cannot be established. No extra database table is required.
         let qtLiveChannel=null,qtLiveOther=null,qtLiveTypingUntil=0;
-        let qtLiveTypingLabel=null,qtLivePresenceLabel=null,qtLiveTypingTimer=null;
+        let qtLiveTypingLabel=null,qtLivePresenceLabel=null,qtLiveTypingTimer=null,qtWasOnline=false;
         function qtStopLive(){
           if(qtLiveTypingTimer){clearTimeout(qtLiveTypingTimer);qtLiveTypingTimer=null;}
           if(qtLiveChannel){try{sb.removeChannel(qtLiveChannel);}catch{}qtLiveChannel=null;}
-          qtLiveOther=null;qtLiveTypingLabel=null;qtLivePresenceLabel=null;
+          qtLiveOther=null;qtLiveTypingLabel=null;qtLivePresenceLabel=null;qtWasOnline=false;
         }
         function qtLiveUpdate(){
           if(!qtLiveChannel||!qtLivePresenceLabel||!qtLiveOther)return;
           const state=qtLiveChannel.presenceState();
           const online=Object.values(state).flat().some(x=>x.user_id===qtLiveOther);
-          qtLivePresenceLabel.textContent=online?'● Online now':'Last seen unavailable';
+          const key='qt-last-observed:'+activeUser.id+':'+qtLiveOther;let last=null;
+          try{if(qtWasOnline&&!online)localStorage.setItem(key,new Date().toISOString());last=localStorage.getItem(key);}catch{}
+          qtWasOnline=online;
+          let label='Last seen unavailable';if(last){const d=new Date(last),now=new Date(),y=new Date();y.setDate(y.getDate()-1);const day=d.toDateString()===now.toDateString()?'today':d.toDateString()===y.toDateString()?'yesterday':d.toLocaleDateString();label='Last seen '+day+' at '+d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});}
+          qtLivePresenceLabel.textContent=online?'● Online now':label;
           qtLivePresenceLabel.style.color=online?'#24dc89':'';
         }
         function qtStartLive(other,requestId,presenceLabel,typingLabel,refresh){
@@ -1783,13 +1791,14 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
               const messages=data||[];const fingerprint=JSON.stringify(messages);
               if(fingerprint!==lastFingerprint){
                 const atBottom=list.scrollHeight-list.scrollTop-list.clientHeight<100;
+                if(header.dataset.selecting==='1'){normalHeader();tray.classList.add('hidden');}
                 list.replaceChildren();
                 if(!messages.length)list.append(el('p','qt-social-mini','No messages yet. Say hello!'));
                 messages.forEach(m=>{
                   if(localStorage.getItem('qt-hidden:'+activeUser.id+':'+m.id))return;
                   const mine=m.sender_id===activeUser.id;const row=el('div','qt-message-row '+(mine?'qt-mine':'qt-theirs'));
                   const bubble=el('div','qt-message-bubble');bubble.append(qtMediaNode(m.body));if(m.body?.startsWith(qtMediaPrefix)){try{const c=JSON.parse(m.body.slice(qtMediaPrefix.length)).caption;if(c)bubble.append(el('div','qt-message-text',c));}catch{}}bubble.append(el('div','qt-message-time',qtWhen(m.created_at)));
-                  let hold; bubble.onpointerdown=()=>{hold=setTimeout(()=>selectMessage(m,bubble),450);};bubble.onpointerup=bubble.onpointercancel=bubble.onpointermove=()=>clearTimeout(hold);bubble.oncontextmenu=e=>{e.preventDefault();selectMessage(m,bubble);};
+                  let hold,x,y; bubble.onpointerdown=e=>{if(e.target.closest('audio,video,button,a'))return;x=e.clientX;y=e.clientY;hold=setTimeout(()=>selectMessage(m,bubble),450);};bubble.onpointerup=bubble.onpointercancel=()=>clearTimeout(hold);bubble.onpointermove=e=>{if(Math.hypot(e.clientX-x,e.clientY-y)>10)clearTimeout(hold);};bubble.oncontextmenu=e=>{e.preventDefault();clearTimeout(hold);selectMessage(m,bubble);};bubble.onclick=e=>{if(header.dataset.selecting==='1'&&!e.target.closest('audio,video,button,a'))selectMessage(m,bubble);};
                   row.append(bubble);list.append(row);
                 });
                 if(atBottom||!lastFingerprint)list.scrollTop=list.scrollHeight;
@@ -1818,8 +1827,8 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
           let previewUrl;const preview=(file,kind)=>{if(previewUrl)URL.revokeObjectURL(previewUrl);previewUrl=URL.createObjectURL(file);tray.replaceChildren();tray.classList.remove('hidden');const v=el(kind==='photo'?'img':kind==='video'?'video':'audio','qt-media-preview');v.src=previewUrl;v.controls=true;const cap=el('input');cap.placeholder='Add a caption…';tray.append(v,cap,qtBtn('Send',async()=>{tray.classList.add('hidden');await sendMedia(file,kind,cap.value);}),qtBtn('Cancel',()=>tray.classList.add('hidden'),true));};
           const showTray=mode=>{tray.replaceChildren();tray.classList.toggle('hidden',false);if(mode==='emoji'){for(const e of Array.from('😀😃😄😁😂🤣😊😍😘🥰😉😎😢😭😡👍👏🙏🔥🎉💕💜🌹'))tray.append(qtBtn(e,()=>{input.setRangeText(e,input.selectionStart,input.selectionEnd,'end');input.focus();update();},true));return;}tray.append(qtBtn('Photo',()=>picker('image/*',true,'photo'),true),qtBtn('Video',()=>picker('video/*',true,'video'),true),qtBtn('Gallery ↑',()=>picker('image/*,video/*',false),true));if(mode!=='camera')tray.append(qtBtn('Audio',()=>picker('audio/*',false,'voice'),true),qtBtn('Location',()=>navigator.geolocation.getCurrentPosition(async p=>{try{await post('https://maps.google.com/?q='+p.coords.latitude+','+p.coords.longitude);tray.classList.add('hidden');}catch(e){mediaStatus.textContent=e.message;}},e=>mediaStatus.textContent=e.message),true));};
           const menu=()=>{tray.replaceChildren();tray.classList.remove('hidden');tray.append(qtBtn('View profile',()=>qtOpenPanel('user',other),true),qtBtn('Search messages',()=>{const q=prompt('Search messages');if(q)Array.from(list.children).find(n=>n.textContent.toLowerCase().includes(q.toLowerCase()))?.scrollIntoView();},true),qtBtn('Block / unblock member',()=>qtOpenPanel('user',other),true),qtBtn('Report member',()=>qtOpenPanel('user',other),true),qtBtn('Refresh messages',refresh,true),qtBtn('Close menu',()=>tray.classList.add('hidden'),true));};
-          const normalHeader=()=>header.replaceChildren(icon('arrow-left','All chats',qtBack),qtAvatar(profile,name),identity,icon('ellipsis-vertical','More options',menu));normalHeader();
-          const selectMessage=(m,bubble)=>{header.replaceChildren(icon('arrow-left','Cancel selection',normalHeader),el('strong','','1'),icon('copy','Copy',async()=>{try{await navigator.clipboard.writeText(m.body);normalHeader();}catch(e){mediaStatus.textContent=e.message;}}),icon('share','Forward',async()=>{const {data,error}=await sb.from('qt_message_requests').select('id,sender_id,recipient_id').eq('status','accepted').or(`sender_id.eq.${activeUser.id},recipient_id.eq.${activeUser.id}`);if(error){mediaStatus.textContent=error.message;return;}tray.replaceChildren(el('strong','','Forward to'));tray.classList.remove('hidden');for(const r of data||[]){const p=await qtReadProfile(r.sender_id===activeUser.id?r.recipient_id:r.sender_id);tray.append(qtBtn(p?.display_name||'Member',async()=>{try{await post(m.body,r.id);tray.classList.add('hidden');normalHeader();mediaStatus.textContent='Forwarded';}catch(e){mediaStatus.textContent=e.message;}},true));}}),icon('trash','Delete',()=>{tray.replaceChildren();tray.classList.remove('hidden');tray.append(qtBtn('Delete for me (this device)',()=>{localStorage.setItem('qt-hidden:'+activeUser.id+':'+m.id,'1');bubble.parentElement.remove();normalHeader();tray.classList.add('hidden');},true));if(m.sender_id===activeUser.id)tray.append(qtBtn('Delete for everyone',async()=>{if(!confirm('Delete this message for everyone?'))return;const {data,error}=await sb.from('qt_messages').update({body:'This message was deleted.'}).eq('id',m.id).eq('sender_id',activeUser.id).select('id');if(error||!data?.length){mediaStatus.textContent=error?.message||'Server does not permit deletion.';return;}notify();await refresh();normalHeader();tray.classList.add('hidden');},true));}));};
+          const normalHeader=()=>{delete header.dataset.selecting;list.querySelectorAll('.qt-selected').forEach(n=>n.classList.remove('qt-selected'));header.replaceChildren(icon('arrow-left','All chats',qtBack),qtAvatar(profile,name),identity,icon('ellipsis-vertical','More options',menu));};normalHeader();
+          const selectMessage=(m,bubble)=>{window.getSelection()?.removeAllRanges();list.querySelectorAll('.qt-selected').forEach(n=>n.classList.remove('qt-selected'));bubble.classList.add('qt-selected');header.dataset.selecting='1';header.replaceChildren(icon('arrow-left','Cancel selection',normalHeader),el('strong','','1'),icon('copy','Copy',async()=>{try{await navigator.clipboard.writeText(m.body);normalHeader();}catch(e){mediaStatus.textContent=e.message;}}),icon('share','Forward',async()=>{const {data,error}=await sb.from('qt_message_requests').select('id,sender_id,recipient_id').eq('status','accepted').or(`sender_id.eq.${activeUser.id},recipient_id.eq.${activeUser.id}`);if(error){mediaStatus.textContent=error.message;return;}tray.replaceChildren(el('strong','','Forward to'));tray.classList.remove('hidden');for(const r of data||[]){const p=await qtReadProfile(r.sender_id===activeUser.id?r.recipient_id:r.sender_id);tray.append(qtBtn(p?.display_name||'Member',async()=>{try{await post(m.body,r.id);tray.classList.add('hidden');normalHeader();mediaStatus.textContent='Forwarded';}catch(e){mediaStatus.textContent=e.message;}},true));}}),icon('trash','Delete',()=>{tray.replaceChildren();tray.classList.remove('hidden');tray.append(qtBtn('Delete for me (this device)',()=>{localStorage.setItem('qt-hidden:'+activeUser.id+':'+m.id,'1');bubble.parentElement.remove();normalHeader();tray.classList.add('hidden');},true));if(m.sender_id===activeUser.id)tray.append(qtBtn('Delete for everyone',async()=>{if(!confirm('Delete this message for everyone?'))return;const {data,error}=await sb.from('qt_messages').delete().eq('id',m.id).eq('sender_id',activeUser.id).select('id');if(error||!data?.length){mediaStatus.textContent=error?.message||'Server does not permit deletion.';return;}notify();await refresh();normalHeader();tray.classList.add('hidden');},true));}));};
           const pill=el('div','qt-pill');pill.append(icon('face-smile','Emoji',()=>showTray('emoji')),input,icon('paperclip','Attachments',()=>showTray('attachments')),cameraButton);const composer=el('div','qt-composer');composer.append(pill,send);box.append(header,list,typing,status,tray,mediaStatus,composer);body.append(box);qtStartLive(other,rId,presence,typing,refresh);qtChatCleanup=()=>{alive=false;cancelled=true;clearInterval(timer);clearTimeout(typingTimeout);if(recorder?.state==='recording')recorder.stop();stream?.getTracks().forEach(t=>t.stop());if(previewUrl)URL.revokeObjectURL(previewUrl);};await refresh();
         }
         if(window.visualViewport){const fit=()=>{const p=document.getElementById('qt-social-panel');p.style.height=p.classList.contains('qt-conversation')?visualViewport.height+'px':'';};visualViewport.addEventListener('resize',fit);new MutationObserver(fit).observe(document.getElementById('qt-social-panel'),{attributes:true,attributeFilter:['class']});}
@@ -1840,6 +1849,12 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
           return {kind,path};
         }
         function qtMediaNode(body){
+          const loc=typeof body==='string'&&body.match(/^https:\/\/maps\.google\.com\/\?q=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/);
+          if(loc&&Math.abs(Number(loc[1]))<=90&&Math.abs(Number(loc[2]))<=180){
+            const lat=Number(loc[1]),lon=Number(loc[2]);const card=el('div','qt-location-card');
+            const map=el('iframe');map.title='Shared location map';map.loading='lazy';map.referrerPolicy='no-referrer';map.src='https://maps.google.com/maps?q='+encodeURIComponent(lat+','+lon)+'&z=15&output=embed';
+            const link=el('a','','📍 Shared location · Get directions');link.href='https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(lat+','+lon);link.target='_blank';link.rel='noopener noreferrer';card.append(map,link);return card;
+          }
           if(!body?.startsWith(qtMediaPrefix)){const d=el('div','qt-message-text',body||'');if(body?.length>500){d.textContent=body.slice(0,500)+'…';d.append(qtBtn('Read more',()=>{d.textContent=body;},true));}return d;}
           try{
             const info=JSON.parse(body.slice(qtMediaPrefix.length));
