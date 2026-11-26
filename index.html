@@ -1734,7 +1734,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
           const photoControls=qtRow(galleryBtn,cameraBtn);
           const cameraBadge=el('button','qt-profile-camera-badge','📷');cameraBadge.type='button';cameraBadge.setAttribute('aria-label','Change profile picture');cameraBadge.title='Change profile picture';cameraBadge.onclick=()=>galleryBtn.click();
           const avatarWrap=el('div','qt-own-avatar-wrap');avatarWrap.append(avatar,cameraBadge);
-          head.replaceChild(avatarWrap,avatar);
+          head.replaceChildren(avatarWrap,el('strong','',p.display_name||activeUser.user_metadata?.username||'Your profile'));
           avatarWrap.onclick=(e)=>{if(e.target===avatar||e.target===avatarWrap)galleryBtn.click();};
 
           const save=qtBtn('Save profile',async()=>{
