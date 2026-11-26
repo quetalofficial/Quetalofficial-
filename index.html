@@ -356,6 +356,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
 .qt-photo-dialog .qt-viewer-content .qt-social-avatar{width:min(78vw,350px)!important;height:min(78vw,350px)!important;font-size:clamp(70px,22vw,140px)!important}
 .qt-private-media img,.qt-photo-dialog img{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .qt-notification-btn{font-size:12px;border:1px solid #22d3ee77;border-radius:12px;padding:9px 12px;background:#21132f;color:#fff}
+.qt-own-avatar-wrap{position:relative;display:inline-flex;flex-shrink:0;cursor:pointer}.qt-profile-camera-badge{position:absolute;right:-7px;bottom:-5px;width:29px;height:29px;border-radius:50%;border:2px solid #151521;background:#22d3ee;color:#101020;font-size:15px;display:grid;place-items:center}
 </style>
 </head>
 <body class="bg-darkbg text-white min-h-screen flex flex-col justify-between">
@@ -1712,10 +1713,29 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
           const bio=qtField('Biography (optional)',p.bio||'',240,true);
           const status=qtField('Current status (optional)',p.status||'',140,true);
           const fileLab=el('label','block text-sm','Profile picture (JPG, PNG or WebP, max 2 MB)');
-          const file=el('input');file.type='file';file.accept='image/jpeg,image/png,image/webp';fileLab.append(file);
+          const file=el('input');file.type='file';file.accept='image/jpeg,image/png,image/webp';file.hidden=true;fileLab.append(file);
           const photoCamera=el('input');photoCamera.type='file';photoCamera.accept='image/*';photoCamera.setAttribute('capture','environment');photoCamera.hidden=true;
-          const photoControls=qtRow(qtBtn('📸 Take photo',()=>photoCamera.click(),true),qtBtn('🖼️ Choose gallery',()=>file.click(),true));
-          photoCamera.onchange=()=>{if(photoCamera.files?.[0]){const dt=new DataTransfer();dt.items.add(photoCamera.files[0]);file.files=dt.files;qtSocialMsg('Photo selected. Tap Save profile.');}};
+          const photoStatus=el('p','qt-social-mini','Choose a photo from Gallery or take a new picture, then tap Save profile.');
+          function qtPickedPhoto(source){
+            const picked=source.files?.[0];if(!picked)return;
+            if(source!==file){try{const dt=new DataTransfer();dt.items.add(picked);file.files=dt.files;}catch(e){qtSocialMsg('Please select the photo using Gallery instead.');return;}}
+            photoStatus.textContent='Selected: '+picked.name+' — tap Save profile.';
+            qtSocialMsg('Photo selected. Tap Save profile.');
+          }
+          file.onchange=()=>qtPickedPhoto(file);
+          photoCamera.onchange=()=>qtPickedPhoto(photoCamera);
+          const galleryBtn=qtBtn('🖼️ Open gallery',async()=>{
+            // showPicker is the closest web-supported direct photo picker;
+            // the browser/Android ultimately decides which app is shown.
+            try{if(typeof file.showPicker==='function')file.showPicker();else file.click();}
+            catch(e){file.click();}
+          },true);
+          const cameraBtn=qtBtn('📸 Take photo',()=>photoCamera.click(),true);
+          const photoControls=qtRow(galleryBtn,cameraBtn);
+          const cameraBadge=el('button','qt-profile-camera-badge','📷');cameraBadge.type='button';cameraBadge.setAttribute('aria-label','Change profile picture');cameraBadge.title='Change profile picture';cameraBadge.onclick=()=>galleryBtn.click();
+          const avatarWrap=el('div','qt-own-avatar-wrap');avatarWrap.append(avatar,cameraBadge);
+          head.replaceChild(avatarWrap,avatar);
+          avatarWrap.onclick=(e)=>{if(e.target===avatar||e.target===avatarWrap)galleryBtn.click();};
 
           const save=qtBtn('Save profile',async()=>{
             save.disabled=true;qtSocialMsg('Saving...');
@@ -1734,7 +1754,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
               qtSocialMsg('Profile saved!');await qtShowMyProfile();
             }catch(e){qtSocialMsg('Could not save: '+e.message);}finally{save.disabled=false;}
           });
-          form.append(head,name.wrap,bio.wrap,status.wrap,fileLab,photoCamera,photoControls,save);
+          form.append(head,name.wrap,bio.wrap,status.wrap,fileLab,photoCamera,photoControls,photoStatus,save);
           const videos=el('div','qt-social-card');videos.append(el('h3','font-bold','My videos'));
           const {data,error}=await sb.from('video_posts').select('caption,created_at').eq('user_id',activeUser.id).order('created_at',{ascending:false}).limit(30);
           if(!error)videos.append(...(data?.length?data.map(v=>el('p','text-sm border-b border-zinc-700 py-2',v.caption)): [el('p','qt-social-mini','No uploaded videos yet.') ]));
