@@ -1844,9 +1844,19 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
           try{
             const info=JSON.parse(body.slice(qtMediaPrefix.length));
             if(!['photo','voice','video'].includes(info.kind)||typeof info.path!=='string'||!/^[-\w]+\/[\w.-]+$/.test(info.path))throw Error('Invalid media');
-            const url=sb.storage.from('qt-media').getPublicUrl(info.path).data.publicUrl;
-            if(info.kind==='photo'){const img=el('img','qt-media-preview');img.src=url;img.alt='Chat photo';img.loading='lazy';return img;}
-            const media=el(info.kind==='voice'?'audio':'video','qt-media-preview');media.src=url;media.controls=true;media.preload='none';if(info.kind==='video')media.playsInline=true;return media;
+            const wrap=el('div');
+            const media=el(info.kind==='photo'?'img':info.kind==='voice'?'audio':'video','qt-media-preview');
+            if(info.kind==='photo'){media.alt='Chat photo';media.loading='lazy';}
+            else{media.controls=true;media.preload='metadata';if(info.kind==='video')media.playsInline=true;}
+            const note=el('div','qt-message-text','Loading attachment…');
+            wrap.append(media,note);let loading=false;
+            const load=async()=>{if(loading)return;loading=true;note.textContent='Loading attachment…';try{
+              const {data,error}=await sb.storage.from('qt-media').createSignedUrl(info.path,3600);
+              if(error||!data?.signedUrl)throw Error(error?.message||'No signed URL returned');
+              media.src=data.signedUrl;note.textContent='';
+            }catch(e){note.textContent='Attachment unavailable: '+e.message+' ';note.append(qtBtn('Retry',load,true));}finally{loading=false;}};
+            media.addEventListener('error',()=>{note.textContent='Could not play or load attachment. ';note.append(qtBtn('Retry',load,true));});
+            load();return wrap;
           }catch{return el('div','qt-message-text','Attachment unavailable');}
         }
         async function qtShowStatuses(){
