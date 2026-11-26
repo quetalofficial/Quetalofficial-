@@ -345,6 +345,17 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
 .qt-composer,.qt-pill{display:flex;align-items:flex-end;gap:3px}.qt-pill{flex:1;min-width:0;background:#302438;border-radius:26px;padding:3px 5px;align-items:center}.qt-pill textarea{flex:1;min-width:0;width:0!important;background:transparent!important;border:0!important;resize:none;padding:8px 2px!important;font-size:16px!important;max-height:120px;outline:none}.qt-icon{width:36px;height:42px;flex-shrink:0;color:inherit;font-size:19px;background:transparent;border:0}.qt-icon[hidden]{display:none}.qt-send{background:#22d3ee;color:#050508;border-radius:50%;width:46px;height:46px;touch-action:none}.qt-tray{max-height:35dvh;overflow:auto;display:flex;flex-wrap:wrap;gap:6px;padding:8px;background:#21132f;border-radius:14px}.qt-tray.hidden{display:none}.qt-tray .qt-media-preview{max-height:22dvh}.qt-theme-light .qt-pill,.qt-theme-light .qt-tray{background:#e5ddef}.qt-chat-screen .qt-voice-indicator:empty{display:none}
 
 .qt-chat-header{position:relative}.qt-chat-header .qt-chat-popup{position:absolute;right:4px;top:100%;z-index:40;width:min(260px,85vw);background:#241632;border:1px solid #75508e;border-radius:12px;box-shadow:0 8px 24px #0009;overflow:hidden;display:grid}.qt-chat-popup.hidden{display:none!important}.qt-chat-popup button{border:0;border-radius:0;text-align:left;background:transparent;padding:13px 16px;font-size:15px}.qt-chat-header .qt-avatar-button{flex:0 0 auto;background:none;border:0;padding:0}.qt-chat-header [role=button]{flex:1;min-width:0;cursor:pointer}.qt-photo-dialog{background:#160d23;color:white;border:0;border-radius:14px;padding:16px;max-width:94vw;margin:auto}.qt-photo-dialog::backdrop{background:#000d}.qt-photo-dialog img{display:block;max-width:85vw;max-height:75dvh;object-fit:contain;margin-top:12px}.qt-theme-light .qt-chat-popup{background:#fff}.qt-theme-light .qt-chat-popup button{color:#171123}
+/* Qué Tal immersive private media viewer */
+.qt-photo-dialog{position:fixed!important;inset:0!important;width:100vw!important;height:100dvh!important;max-width:none!important;max-height:none!important;margin:0!important;padding:0!important;border-radius:0!important;background:#050309!important;overflow:hidden!important;box-sizing:border-box!important}
+.qt-photo-dialog[open]{display:flex!important;flex-direction:column;align-items:center;justify-content:center}
+.qt-photo-dialog::backdrop{background:#000!important}
+.qt-photo-dialog .qt-viewer-bar{position:absolute;top:0;left:0;right:0;z-index:2;display:flex;align-items:center;justify-content:space-between;padding:max(14px,env(safe-area-inset-top)) 16px 12px;background:linear-gradient(#000b,transparent);color:#fff}
+.qt-photo-dialog .qt-viewer-bar button{border:1px solid #ffffff55;border-radius:50%;width:42px;height:42px;background:#241632;color:#fff;font-size:24px}
+.qt-photo-dialog .qt-viewer-content{width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:70px 12px 45px;box-sizing:border-box}
+.qt-photo-dialog .qt-viewer-content img{display:block;width:auto!important;height:auto!important;max-width:100%!important;max-height:100%!important;object-fit:contain!important;margin:0!important;border-radius:0!important}
+.qt-photo-dialog .qt-viewer-content .qt-social-avatar{width:min(78vw,350px)!important;height:min(78vw,350px)!important;font-size:clamp(70px,22vw,140px)!important}
+.qt-private-media img,.qt-photo-dialog img{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.qt-notification-btn{font-size:12px;border:1px solid #22d3ee77;border-radius:12px;padding:9px 12px;background:#21132f;color:#fff}
 </style>
 </head>
 <body class="bg-darkbg text-white min-h-screen flex flex-col justify-between">
@@ -1541,7 +1552,10 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
           if(!activeUser||document.hidden)return;
           const uid=activeUser.id;if(qtSeenOwner===uid&&Date.now()-qtSeenWriteAt<55000)return;
           qtSeenOwner=uid;qtSeenWriteAt=Date.now();
-          const {error}=await sb.rpc('qt_touch_last_seen');if(error)console.warn('Last seen write:',error.message);
+          let {error}=await sb.rpc('qt_touch_last_seen');
+          // Fallback when the optional RPC has not been installed on Supabase.
+          if(error){const result=await sb.from('qt_last_seen').upsert({user_id:uid,last_seen_at:new Date().toISOString()},{onConflict:'user_id'});error=result.error;}
+          if(error){qtSeenWriteAt=0;console.warn('Last seen write:',error.message);}
         }
         async function qtFetchSeen(){
           const other=qtLiveOther;if(!other||qtSeenBusy)return;qtSeenBusy=true;
@@ -1556,7 +1570,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
           const key='qt-last-observed:'+activeUser.id+':'+qtLiveOther;let last=null;
           try{if(qtWasOnline&&!online)localStorage.setItem(key,new Date().toISOString());last=localStorage.getItem(key);}catch{}
           qtWasOnline=online;
-          last=qtStoredSeen;let label='Last seen unavailable';if(last){const d=new Date(last),now=new Date(),y=new Date();y.setDate(y.getDate()-1);const day=d.toDateString()===now.toDateString()?'today':d.toDateString()===y.toDateString()?'yesterday':d.toLocaleDateString();label='Last seen '+day+' at '+d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});}
+          last=qtStoredSeen||last;let label='Last seen unavailable';if(last){const d=new Date(last),now=new Date(),y=new Date();y.setDate(y.getDate()-1);const day=d.toDateString()===now.toDateString()?'today':d.toDateString()===y.toDateString()?'yesterday':d.toLocaleDateString();label='Last seen '+day+' at '+d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});}
           qtLivePresenceLabel.textContent=online?'● Online now':label;
           qtLivePresenceLabel.style.color=online?'#24dc89':'';
         }
@@ -1583,6 +1597,14 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
           if(qtLiveChannel)qtLiveChannel.send({type:'broadcast',event:'typing',payload:{user_id:activeUser.id,typing}}).catch(()=>{});
         }
 
+        function qtOpenPhotoViewer(profile,name){
+          const d=el('dialog','qt-photo-dialog');d.setAttribute('aria-label',name+' profile picture');
+          const bar=el('div','qt-viewer-bar');const title=el('strong','',name);const close=el('button','','×');close.type='button';close.setAttribute('aria-label','Close photo');close.onclick=()=>d.close();bar.append(title,close);
+          const content=el('div','qt-viewer-content');const url=qtProfileImage(profile);const picture=url?el('img'):qtAvatar(profile,name);
+          if(url){picture.src=url;picture.alt=name+' profile picture';picture.draggable=false;picture.onerror=()=>{content.replaceChildren(qtAvatar(profile,name));};}
+          content.append(picture);d.append(bar,content);d.addEventListener('click',e=>{if(e.target===d||e.target===content)d.close();});
+          d.addEventListener('contextmenu',e=>e.preventDefault());d.onclose=()=>d.remove();document.body.append(d);d.showModal();
+        }
         const qtProfileImage = p => p?.avatar_path ? sb.storage.from('quetal-avatars').getPublicUrl(p.avatar_path).data.publicUrl : '';
         const qtBtn = (text,fn,secondary=false) => {const b=el('button',secondary?'qt-social-secondary':'qt-social-btn',text);b.type='button';b.onclick=fn;return b;};
         const qtField = (label,value='',max=100,multiline=false) => {
@@ -1609,6 +1631,24 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
           if(url){const img=el('img','qt-social-avatar');img.alt='';img.style.width='100%';img.style.height='100%';img.style.borderRadius='50%';img.onload=()=>{wrap.textContent='';wrap.append(img);};img.onerror=()=>{};img.src=url;}
           return wrap;
         };
+        let qtNotificationsBaseline=null;
+        async function qtEnableNotifications(){
+          if(!('Notification' in window)){qtSocialMsg('This browser does not support notifications.');return;}
+          if(!window.isSecureContext){qtSocialMsg('Notifications require HTTPS.');return;}
+          const permission=await Notification.requestPermission();
+          if(permission==='granted'){
+            try{localStorage.setItem('qt-notify-opt-in','1');}catch{}
+            qtSocialMsg('Notifications enabled while Qué Tal is running. Closed-app push requires server setup.');
+          }else qtSocialMsg('Notification permission was not granted.');
+        }
+        function qtMaybeNotify(count,unread){
+          const current=count+unread;
+          if(qtNotificationsBaseline===null){qtNotificationsBaseline=current;return;}
+          const increased=current>qtNotificationsBaseline;qtNotificationsBaseline=current;
+          if(!increased||document.visibilityState==='visible'||Notification.permission!=='granted')return;
+          try{if(localStorage.getItem('qt-notify-opt-in')!=='1')return;}catch{return;}
+          try{const n=new Notification('Qué Tal Social',{body:'You have a new message or message request.',tag:'quetal-chat-update'});n.onclick=()=>{window.focus();qtOpenPanel('chats');n.close();};}catch(e){console.warn('Notification:',e);}
+        }
         let qtBadgeBusy=false;
         async function qtRefreshRequestBadge(){
           if(qtBadgeBusy)return;qtBadgeBusy=true;
@@ -1627,6 +1667,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
               if(me)return;
               if((messages||[]).some(m=>m.sender_id!==activeUser.id && (!qtGetRead(r.id)||m.created_at>qtGetRead(r.id))))unreadConversations++;
             }));
+            qtMaybeNotify(error?0:(count||0),unreadConversations);
             if(unreadConversations){unreadBadge.textContent=String(unreadConversations);unreadBadge.title=unreadConversations+' unread conversations';unreadBadge.classList.remove('hidden');}
             else {unreadBadge.classList.add('hidden');unreadBadge.textContent='';}
           }finally{qtBadgeBusy=false;}
@@ -1759,7 +1800,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
           }));
           if(qtCurrentPanel?.type!=='chats')return;
           entries.sort((a,b)=>(b.last?.created_at||'').localeCompare(a.last?.created_at||''));
-          const actions=qtRow(qtBtn('Message requests',()=>qtOpenPanel('requests')),qtBtn('Find people',()=>qtOpenPanel('people'),true));
+          const actions=qtRow(qtBtn('Message requests',()=>qtOpenPanel('requests')),qtBtn('Find people',()=>qtOpenPanel('people'),true),qtBtn('🔔 Enable phone alerts',qtEnableNotifications,true));
           const list=el('div','qt-chat-list');
           if(!entries.length)list.append(el('p','qt-social-mini','No conversations yet. Search for a member and send a message request.'));
           entries.forEach(e=>{
@@ -1787,7 +1828,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
           if(error)qtSocialMsg(error.message);else {await qtRefreshRequestBadge();qtOpenPanel('requests');}
         }
         async function qtShowChatInfo(uid){
-          const p=await qtReadProfile(uid),name=p?.display_name||'Member';const card=el('div','qt-social-card');card.append(qtAvatar(p,name),el('h2','text-xl font-bold',name),el('p','text-sm',p?.bio||''),el('p','qt-social-mini',p?.status||''),qtBtn('View member profile',()=>qtOpenPanel('user',uid),true));qtSocialBody().append(card);
+          const p=await qtReadProfile(uid),name=p?.display_name||'Member';const card=el('div','qt-social-card');card.classList.add('qt-private-media');const photoBtn=el('button');photoBtn.type='button';photoBtn.style.cssText='background:none;border:0;padding:0;width:fit-content';photoBtn.setAttribute('aria-label','View profile picture');photoBtn.append(qtAvatar(p,name));photoBtn.onclick=()=>qtOpenPhotoViewer(p,name);card.append(photoBtn,el('h2','text-xl font-bold',name),el('p','text-sm',p?.bio||''),el('p','qt-social-mini',p?.status||''),qtBtn('View member profile',()=>qtOpenPanel('user',uid),true));qtSocialBody().append(card);
           const {data:req,error}=await sb.from('qt_message_requests').select('id').eq('status','accepted').or(`and(sender_id.eq.${activeUser.id},recipient_id.eq.${uid}),and(sender_id.eq.${uid},recipient_id.eq.${activeUser.id})`);if(error)throw error;
           const section=el('div','qt-social-card');section.append(el('h3','font-bold','Media, links and docs'));qtSocialBody().append(section);if(!req?.length)return;
           const result=await sb.from('qt_messages').select('id,body,created_at').in('request_id',req.map(r=>r.id)).order('created_at',{ascending:false}).limit(200);if(result.error)throw result.error;
@@ -1852,7 +1893,8 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
           const popup=el('div','qt-chat-popup hidden');header.append(popup);
           const closeMenu=()=>popup.classList.add('hidden');
           const action=(label,fn)=>qtBtn(label,async()=>{closeMenu();try{await fn();}catch(e){mediaStatus.textContent=e.message||String(e);}},true);
-          const photoOpen=()=>{const d=el('dialog','qt-photo-dialog');const url=qtProfileImage(profile);const picture=url?el('img'):qtAvatar(profile,name);if(url){picture.src=url;picture.alt=name;}d.append(qtBtn('Close',()=>d.close(),true),picture);d.onclose=()=>d.remove();document.body.append(d);d.showModal();};
+          const photoOpen=()=>qtOpenPhotoViewer(profile,name);
+
           const infoOpen=()=>qtOpenPanel('chatinfo',other);
           const block=async()=>{const blocked=await qtBlocked(other);if(!confirm((blocked?'Unblock ':'Block ')+name+'?'))return;const result=blocked?await sb.from('qt_blocks').delete().eq('blocker_id',activeUser.id).eq('blocked_id',other):await sb.from('qt_blocks').insert({blocker_id:activeUser.id,blocked_id:other});if(result.error)throw result.error;mediaStatus.textContent=blocked?'Member unblocked':'Member blocked';if(!blocked)qtOpenPanel('chats');};
           const report=()=>{const reason=prompt('Why are you reporting this member?');if(reason===null)return;if(reason.trim().length<5){mediaStatus.textContent='Please give a short explanation.';return;}return sb.from('qt_reports').insert({reporter_id:activeUser.id,reported_user_id:other,reason:reason.trim().slice(0,500)}).then(({error})=>{if(error)throw error;mediaStatus.textContent='Report submitted privately for review.';});};
