@@ -343,6 +343,8 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
 .qt-chat-screen .qt-chat-header{flex-shrink:0;padding:5px;gap:8px}.qt-chat-header>div:nth-last-child(2){flex:1}.qt-chat-header .qt-social-avatar{width:40px;height:40px}
 .qt-chat-screen .qt-chat-messages{flex:1;min-height:0;max-height:none;border-radius:0}.qt-chat-screen .qt-chat-status{display:none}
 .qt-composer,.qt-pill{display:flex;align-items:flex-end;gap:3px}.qt-pill{flex:1;min-width:0;background:#302438;border-radius:26px;padding:3px 5px;align-items:center}.qt-pill textarea{flex:1;min-width:0;width:0!important;background:transparent!important;border:0!important;resize:none;padding:8px 2px!important;font-size:16px!important;max-height:120px;outline:none}.qt-icon{width:36px;height:42px;flex-shrink:0;color:inherit;font-size:19px;background:transparent;border:0}.qt-icon[hidden]{display:none}.qt-send{background:#22d3ee;color:#050508;border-radius:50%;width:46px;height:46px;touch-action:none}.qt-tray{max-height:35dvh;overflow:auto;display:flex;flex-wrap:wrap;gap:6px;padding:8px;background:#21132f;border-radius:14px}.qt-tray.hidden{display:none}.qt-tray .qt-media-preview{max-height:22dvh}.qt-theme-light .qt-pill,.qt-theme-light .qt-tray{background:#e5ddef}.qt-chat-screen .qt-voice-indicator:empty{display:none}
+
+.qt-chat-header{position:relative}.qt-chat-header .qt-chat-popup{position:absolute;right:4px;top:100%;z-index:40;width:min(260px,85vw);background:#241632;border:1px solid #75508e;border-radius:12px;box-shadow:0 8px 24px #0009;overflow:hidden;display:grid}.qt-chat-popup.hidden{display:none!important}.qt-chat-popup button{border:0;border-radius:0;text-align:left;background:transparent;padding:13px 16px;font-size:15px}.qt-chat-header .qt-avatar-button{flex:0 0 auto;background:none;border:0;padding:0}.qt-chat-header [role=button]{flex:1;min-width:0;cursor:pointer}.qt-photo-dialog{background:#160d23;color:white;border:0;border-radius:14px;padding:16px;max-width:94vw;margin:auto}.qt-photo-dialog::backdrop{background:#000d}.qt-photo-dialog img{display:block;max-width:85vw;max-height:75dvh;object-fit:contain;margin-top:12px}.qt-theme-light .qt-chat-popup{background:#fff}.qt-theme-light .qt-chat-popup button{color:#171123}
 </style>
 </head>
 <body class="bg-darkbg text-white min-h-screen flex flex-col justify-between">
@@ -1534,6 +1536,19 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
           if(qtLiveChannel){try{sb.removeChannel(qtLiveChannel);}catch{}qtLiveChannel=null;}
           qtLiveOther=null;qtLiveTypingLabel=null;qtLivePresenceLabel=null;qtWasOnline=false;
         }
+        let qtStoredSeen=null, qtSeenBusy=false, qtSeenOwner=null, qtSeenWriteAt=0;
+        async function qtTouchSeen(){
+          if(!activeUser||document.hidden)return;
+          const uid=activeUser.id;if(qtSeenOwner===uid&&Date.now()-qtSeenWriteAt<55000)return;
+          qtSeenOwner=uid;qtSeenWriteAt=Date.now();
+          const {error}=await sb.rpc('qt_touch_last_seen');if(error)console.warn('Last seen write:',error.message);
+        }
+        async function qtFetchSeen(){
+          const other=qtLiveOther;if(!other||qtSeenBusy)return;qtSeenBusy=true;
+          try{const {data,error}=await sb.from('qt_last_seen').select('last_seen_at').eq('user_id',other).maybeSingle();if(other===qtLiveOther){qtStoredSeen=error?null:data?.last_seen_at;qtLiveUpdate();}if(error)console.warn('Last seen read:',error.message);}finally{qtSeenBusy=false;}
+        }
+        setInterval(()=>{qtTouchSeen().catch(()=>{});qtFetchSeen().catch(()=>{});},15000);
+        document.addEventListener('visibilitychange',()=>{if(!document.hidden){qtTouchSeen().catch(()=>{});qtFetchSeen().catch(()=>{});}});
         function qtLiveUpdate(){
           if(!qtLiveChannel||!qtLivePresenceLabel||!qtLiveOther)return;
           const state=qtLiveChannel.presenceState();
@@ -1541,13 +1556,13 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
           const key='qt-last-observed:'+activeUser.id+':'+qtLiveOther;let last=null;
           try{if(qtWasOnline&&!online)localStorage.setItem(key,new Date().toISOString());last=localStorage.getItem(key);}catch{}
           qtWasOnline=online;
-          let label='Last seen unavailable';if(last){const d=new Date(last),now=new Date(),y=new Date();y.setDate(y.getDate()-1);const day=d.toDateString()===now.toDateString()?'today':d.toDateString()===y.toDateString()?'yesterday':d.toLocaleDateString();label='Last seen '+day+' at '+d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});}
+          last=qtStoredSeen;let label='Last seen unavailable';if(last){const d=new Date(last),now=new Date(),y=new Date();y.setDate(y.getDate()-1);const day=d.toDateString()===now.toDateString()?'today':d.toDateString()===y.toDateString()?'yesterday':d.toLocaleDateString();label='Last seen '+day+' at '+d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});}
           qtLivePresenceLabel.textContent=online?'● Online now':label;
           qtLivePresenceLabel.style.color=online?'#24dc89':'';
         }
         function qtStartLive(other,requestId,presenceLabel,typingLabel,refresh){
           qtStopLive();
-          qtLiveOther=other;qtLivePresenceLabel=presenceLabel;qtLiveTypingLabel=typingLabel;
+          qtLiveOther=other;qtLivePresenceLabel=presenceLabel;qtLiveTypingLabel=typingLabel;qtStoredSeen=null;qtTouchSeen().catch(()=>{});qtFetchSeen().catch(()=>{});
           if(!sb?.channel)return;
           const ch=sb.channel('qt-chat-live-'+requestId,{config:{presence:{key:activeUser.id},broadcast:{self:false}}});
           qtLiveChannel=ch;
@@ -1561,7 +1576,7 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
             .on('broadcast',{event:'message'},({payload})=>{if(payload?.user_id===other)refresh().catch(()=>{});})
             .subscribe(async status=>{
               if(status==='SUBSCRIBED'){try{await ch.track({user_id:activeUser.id,online_at:new Date().toISOString()});}catch{}}
-              if(status==='CHANNEL_ERROR'||status==='TIMED_OUT')presenceLabel.textContent='Online status unavailable';
+              if(status==='CHANNEL_ERROR'||status==='TIMED_OUT')qtLiveUpdate();
             });
         }
         function qtSendTyping(typing){
@@ -1633,13 +1648,14 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
           document.getElementById('qt-social-panel').classList.remove('hidden');
           document.querySelectorAll('#community-videos video:not(.qt-preview-frame)').forEach(v=>v.dispatchEvent(new Event('qt-stop-video')));
           qtSocialBody().replaceChildren();qtSocialMsg('');
-          document.getElementById('qt-social-title').textContent=({me:'My Profile',user:'Member Profile',people:'Discover People',chats:'Qué tal Chat',chat:'Conversation',requests:'Message Requests',statuses:'Status Updates'})[type]||'Qué tal';
+          document.getElementById('qt-social-title').textContent=({me:'My Profile',user:'Member Profile',people:'Discover People',chats:'Qué tal Chat',chat:'Conversation',chatinfo:'Contact info',requests:'Message Requests',statuses:'Status Updates'})[type]||'Qué tal';
           try {
             if(type==='me') await qtShowMyProfile();
             if(type==='user') await qtShowUserProfile(uid);
             if(type==='people') await qtShowPeople();
             if(type==='chats') await qtShowChats();
             if(type==='chat') await qtShowConversation(uid);
+            if(type==='chatinfo') await qtShowChatInfo(uid);
             if(type==='requests') await qtShowRequests();
             if(type==='statuses') await qtShowStatuses();
           } catch(e){qtSocialMsg('Member features are not configured yet: '+(e.message||e));}
@@ -1770,6 +1786,13 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
           const {error}=await sb.from('qt_message_requests').update({status}).eq('id',id).eq('recipient_id',activeUser.id);
           if(error)qtSocialMsg(error.message);else {await qtRefreshRequestBadge();qtOpenPanel('requests');}
         }
+        async function qtShowChatInfo(uid){
+          const p=await qtReadProfile(uid),name=p?.display_name||'Member';const card=el('div','qt-social-card');card.append(qtAvatar(p,name),el('h2','text-xl font-bold',name),el('p','text-sm',p?.bio||''),el('p','qt-social-mini',p?.status||''),qtBtn('View member profile',()=>qtOpenPanel('user',uid),true));qtSocialBody().append(card);
+          const {data:req,error}=await sb.from('qt_message_requests').select('id').eq('status','accepted').or(`and(sender_id.eq.${activeUser.id},recipient_id.eq.${uid}),and(sender_id.eq.${uid},recipient_id.eq.${activeUser.id})`);if(error)throw error;
+          const section=el('div','qt-social-card');section.append(el('h3','font-bold','Media, links and docs'));qtSocialBody().append(section);if(!req?.length)return;
+          const result=await sb.from('qt_messages').select('id,body,created_at').in('request_id',req.map(r=>r.id)).order('created_at',{ascending:false}).limit(200);if(result.error)throw result.error;
+          const items=(result.data||[]).filter(m=>!localStorage.getItem('qt-hidden:'+activeUser.id+':'+m.id)&&(m.body?.startsWith(qtMediaPrefix)||/^https?:\/\//i.test(m.body)));if(!items.length)section.append(el('p','qt-social-mini','No shared media or links yet.'));for(const m of items){const row=el('div','qt-social-card');if(m.body.startsWith(qtMediaPrefix)||m.body.startsWith('https://maps.google.com/?q='))row.append(qtMediaNode(m.body));else{const a=el('a','underline',m.body);a.href=m.body;a.target='_blank';a.rel='noopener noreferrer';row.append(a);}row.append(el('p','qt-social-mini',new Date(m.created_at).toLocaleString()));section.append(row);}
+        }
         async function qtShowConversation(other){
           const body=qtSocialBody();body.replaceChildren();
           const {data:req,error:reqErr}=await sb.from('qt_message_requests').select('id').eq('status','accepted')
@@ -1826,8 +1849,17 @@ body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom))
           const picker=(accept,capture,kind)=>{const f=el('input');f.type='file';f.accept=accept;if(capture)f.setAttribute('capture','environment');f.onchange=()=>{const file=f.files?.[0];if(!file)return;preview(file,kind|| (file.type.startsWith('video/')?'video':'photo'));};f.click();};
           let previewUrl;const preview=(file,kind)=>{if(previewUrl)URL.revokeObjectURL(previewUrl);previewUrl=URL.createObjectURL(file);tray.replaceChildren();tray.classList.remove('hidden');const v=el(kind==='photo'?'img':kind==='video'?'video':'audio','qt-media-preview');v.src=previewUrl;v.controls=true;const cap=el('input');cap.placeholder='Add a caption…';tray.append(v,cap,qtBtn('Send',async()=>{tray.classList.add('hidden');await sendMedia(file,kind,cap.value);}),qtBtn('Cancel',()=>tray.classList.add('hidden'),true));};
           const showTray=mode=>{tray.replaceChildren();tray.classList.toggle('hidden',false);if(mode==='emoji'){for(const e of Array.from('😀😃😄😁😂🤣😊😍😘🥰😉😎😢😭😡👍👏🙏🔥🎉💕💜🌹'))tray.append(qtBtn(e,()=>{input.setRangeText(e,input.selectionStart,input.selectionEnd,'end');input.focus();update();},true));return;}tray.append(qtBtn('Photo',()=>picker('image/*',true,'photo'),true),qtBtn('Video',()=>picker('video/*',true,'video'),true),qtBtn('Gallery ↑',()=>picker('image/*,video/*',false),true));if(mode!=='camera')tray.append(qtBtn('Audio',()=>picker('audio/*',false,'voice'),true),qtBtn('Location',()=>navigator.geolocation.getCurrentPosition(async p=>{try{await post('https://maps.google.com/?q='+p.coords.latitude+','+p.coords.longitude);tray.classList.add('hidden');}catch(e){mediaStatus.textContent=e.message;}},e=>mediaStatus.textContent=e.message),true));};
-          const menu=()=>{tray.replaceChildren();tray.classList.remove('hidden');tray.append(qtBtn('View profile',()=>qtOpenPanel('user',other),true),qtBtn('Search messages',()=>{const q=prompt('Search messages');if(q)Array.from(list.children).find(n=>n.textContent.toLowerCase().includes(q.toLowerCase()))?.scrollIntoView();},true),qtBtn('Block / unblock member',()=>qtOpenPanel('user',other),true),qtBtn('Report member',()=>qtOpenPanel('user',other),true),qtBtn('Refresh messages',refresh,true),qtBtn('Close menu',()=>tray.classList.add('hidden'),true));};
-          const normalHeader=()=>{delete header.dataset.selecting;list.querySelectorAll('.qt-selected').forEach(n=>n.classList.remove('qt-selected'));header.replaceChildren(icon('arrow-left','All chats',qtBack),qtAvatar(profile,name),identity,icon('ellipsis-vertical','More options',menu));};normalHeader();
+          const popup=el('div','qt-chat-popup hidden');header.append(popup);
+          const closeMenu=()=>popup.classList.add('hidden');
+          const action=(label,fn)=>qtBtn(label,async()=>{closeMenu();try{await fn();}catch(e){mediaStatus.textContent=e.message||String(e);}},true);
+          const photoOpen=()=>{const d=el('dialog','qt-photo-dialog');const url=qtProfileImage(profile);const picture=url?el('img'):qtAvatar(profile,name);if(url){picture.src=url;picture.alt=name;}d.append(qtBtn('Close',()=>d.close(),true),picture);d.onclose=()=>d.remove();document.body.append(d);d.showModal();};
+          const infoOpen=()=>qtOpenPanel('chatinfo',other);
+          const block=async()=>{const blocked=await qtBlocked(other);if(!confirm((blocked?'Unblock ':'Block ')+name+'?'))return;const result=blocked?await sb.from('qt_blocks').delete().eq('blocker_id',activeUser.id).eq('blocked_id',other):await sb.from('qt_blocks').insert({blocker_id:activeUser.id,blocked_id:other});if(result.error)throw result.error;mediaStatus.textContent=blocked?'Member unblocked':'Member blocked';if(!blocked)qtOpenPanel('chats');};
+          const report=()=>{const reason=prompt('Why are you reporting this member?');if(reason===null)return;if(reason.trim().length<5){mediaStatus.textContent='Please give a short explanation.';return;}return sb.from('qt_reports').insert({reporter_id:activeUser.id,reported_user_id:other,reason:reason.trim().slice(0,500)}).then(({error})=>{if(error)throw error;mediaStatus.textContent='Report submitted privately for review.';});};
+          const more=()=>{popup.replaceChildren(action('Report',report),action('Block / unblock',block),action('Refresh messages',refresh),action('Back to menu',()=>menu(true)));popup.classList.remove('hidden');};
+          const menu=(force=false)=>{if(force!==true&&!popup.classList.contains('hidden')){closeMenu();return;}popup.replaceChildren(action('View contact',infoOpen),action('Search',()=>{const q=prompt('Search messages');if(q){const found=Array.from(list.children).find(n=>n.textContent.toLowerCase().includes(q.toLowerCase()));if(found)found.scrollIntoView({block:'center'});else mediaStatus.textContent='No matching loaded messages.';}}),action('Media, links and docs',infoOpen),action('Chat theme',()=>{tray.replaceChildren(qtThemePicker());tray.classList.remove('hidden');}),action('More ›',more));popup.classList.remove('hidden');};
+          box.addEventListener('pointerdown',e=>{if(!header.contains(e.target))closeMenu();});
+          const normalHeader=()=>{delete header.dataset.selecting;list.querySelectorAll('.qt-selected').forEach(n=>n.classList.remove('qt-selected'));const avatarButton=el('button','qt-avatar-button');avatarButton.type='button';avatarButton.setAttribute('aria-label','Open profile picture');avatarButton.append(qtAvatar(profile,name));avatarButton.onclick=photoOpen;identity.onclick=infoOpen;identity.setAttribute('role','button');identity.tabIndex=0;identity.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();infoOpen();}};header.replaceChildren(icon('arrow-left','All chats',qtBack),avatarButton,identity,icon('ellipsis-vertical','More options',()=>menu()),popup);closeMenu();};normalHeader();
           const selectMessage=(m,bubble)=>{window.getSelection()?.removeAllRanges();list.querySelectorAll('.qt-selected').forEach(n=>n.classList.remove('qt-selected'));bubble.classList.add('qt-selected');header.dataset.selecting='1';header.replaceChildren(icon('arrow-left','Cancel selection',normalHeader),el('strong','','1'),icon('copy','Copy',async()=>{try{await navigator.clipboard.writeText(m.body);normalHeader();}catch(e){mediaStatus.textContent=e.message;}}),icon('share','Forward',async()=>{const {data,error}=await sb.from('qt_message_requests').select('id,sender_id,recipient_id').eq('status','accepted').or(`sender_id.eq.${activeUser.id},recipient_id.eq.${activeUser.id}`);if(error){mediaStatus.textContent=error.message;return;}tray.replaceChildren(el('strong','','Forward to'));tray.classList.remove('hidden');for(const r of data||[]){const p=await qtReadProfile(r.sender_id===activeUser.id?r.recipient_id:r.sender_id);tray.append(qtBtn(p?.display_name||'Member',async()=>{try{await post(m.body,r.id);tray.classList.add('hidden');normalHeader();mediaStatus.textContent='Forwarded';}catch(e){mediaStatus.textContent=e.message;}},true));}}),icon('trash','Delete',()=>{tray.replaceChildren();tray.classList.remove('hidden');tray.append(qtBtn('Delete for me (this device)',()=>{localStorage.setItem('qt-hidden:'+activeUser.id+':'+m.id,'1');bubble.parentElement.remove();normalHeader();tray.classList.add('hidden');},true));if(m.sender_id===activeUser.id)tray.append(qtBtn('Delete for everyone',async()=>{if(!confirm('Delete this message for everyone?'))return;const {data,error}=await sb.from('qt_messages').delete().eq('id',m.id).eq('sender_id',activeUser.id).select('id');if(error||!data?.length){mediaStatus.textContent=error?.message||'Server does not permit deletion.';return;}notify();await refresh();normalHeader();tray.classList.add('hidden');},true));}));};
           const pill=el('div','qt-pill');pill.append(icon('face-smile','Emoji',()=>showTray('emoji')),input,icon('paperclip','Attachments',()=>showTray('attachments')),cameraButton);const composer=el('div','qt-composer');composer.append(pill,send);box.append(header,list,typing,status,tray,mediaStatus,composer);body.append(box);qtStartLive(other,rId,presence,typing,refresh);qtChatCleanup=()=>{alive=false;cancelled=true;clearInterval(timer);clearTimeout(typingTimeout);if(recorder?.state==='recording')recorder.stop();stream?.getTracks().forEach(t=>t.stop());if(previewUrl)URL.revokeObjectURL(previewUrl);};await refresh();
         }
