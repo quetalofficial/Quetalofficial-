@@ -1,0 +1,2027 @@
+<!DOCTYPE html>
+<html lang="tr" class="dark">
+<head>
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Qué tal — Global Social Portal</title>
+    <!-- Qué tal social link preview -->
+    <meta name="description" content="Join Qué tal, a social video community. Sign up, discover videos and share your own.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Qué tal">
+    <meta property="og:title" content="Qué tal — Social Video Network">
+    <meta property="og:description" content="Join Qué tal to discover, watch and share videos. Register and start exploring.">
+    <meta property="og:url" content="https://quetal.company/">
+    <meta property="og:image" content="https://quetal.company/quetal-share-preview.jpg">
+    <meta property="og:image:width" content="1536">
+    <meta property="og:image:height" content="864">
+    <meta property="og:image:alt" content="Qué tal Social Video Network neon blue and pink logo">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Qué tal — Social Video Network">
+    <meta name="twitter:description" content="Discover, watch and share videos on Qué tal.">
+    <meta name="twitter:image" content="https://quetal.company/quetal-share-preview.jpg">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#050508',
+                        cardbg: '#0F0F17',
+                        cardhover: '#151522',
+                        neonpurple: '#9D00FF',
+                        neoncian: '#00F0FF',
+                        neonpink: '#FF007F',
+                    }
+                }
+            }
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #050508;
+            color: #ffffff;
+            overflow-x: hidden;
+        }
+        .neon-glow-purple {
+            box-shadow: 0 0 25px rgba(157, 0, 255, 0.4);
+        }
+        .neon-glow-cyan {
+            box-shadow: 0 0 25px rgba(0, 240, 255, 0.4);
+        }
+        .neon-glow-pink {
+            box-shadow: 0 0 25px rgba(255, 0, 127, 0.4);
+        }
+        .text-glow-cyan {
+            text-shadow: 0 0 10px rgba(0, 240, 255, 0.8);
+        }
+        .text-glow-pink {
+            text-shadow: 0 0 10px rgba(255, 0, 127, 0.8);
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #050508;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #202030;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #9D00FF;
+        }
+        /* Installation belongs to the scrollable welcome/signup page, never the video feed. */
+        body.qt-feed-active #quetal-install-guide,
+        body.qt-feed-active #quetal-install-banner { display: none !important; }
+        body:not(.qt-feed-active) { overflow-y: auto; }
+        body:not(.qt-feed-active) > main { overflow: visible; flex-shrink: 0; }
+        body:not(.qt-feed-active) #view-registration { align-self: start; }
+        /* Full-height, swipeable short-video feed */
+        #community-videos { height: min(76dvh, 790px); overflow-y: auto; scroll-snap-type: y mandatory; overscroll-behavior-y: contain; scrollbar-width: none; border-radius: 18px; }
+        #community-videos::-webkit-scrollbar { display: none; }
+        .qt-video-card { position: relative; height: 100%; min-height: 100%; scroll-snap-align: start; scroll-snap-stop: always; background: #000; overflow: hidden; }
+        .qt-tap-play { position:absolute; z-index:4; top:45%; left:50%; transform:translate(-50%,-50%); width:76px; height:76px; border-radius:50%; background:rgba(0,0,0,.68); border:2px solid rgba(255,255,255,.85); color:white; font-size:34px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+        .qt-tap-play.qt-playing { opacity:.12; }
+        .qt-tap-play.qt-playing:focus, .qt-tap-play.qt-playing:active { opacity:1; }
+        .qt-video-poster { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; background:#141421; pointer-events:none; }
+        .qt-video-card video.qt-preview-frame { position:absolute; inset:0; z-index:0; background:transparent; pointer-events:none; }
+        .qt-video-card video:not(.qt-preview-frame) { position:relative; z-index:1; display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; background: #000; }
+        .qt-video-shade { position: absolute; inset: auto 0 0 0; height: 48%; pointer-events: none; background: linear-gradient(transparent, rgba(0,0,0,.85)); }
+        .qt-video-info { position: absolute; bottom: 14px; left: 12px; right: 78px; text-shadow: 0 1px 4px #000; }
+        .qt-video-actions { position: absolute; bottom: 48px; right: 10px; display: flex; flex-direction: column; align-items: center; gap: 13px; }
+        .qt-video-views { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; color: #e5e7eb; margin-top: 5px; text-shadow: 0 1px 4px #000; }
+        .qt-video-views i { font-size: 12px; }
+        .qt-action { background: rgba(10,10,20,.68); border: 1px solid rgba(255,255,255,.22); border-radius: 18px; padding: 8px 7px; min-width: 57px; color: white; font-size: 11px; font-weight: 700; }
+        .qt-action i { display: block; font-size: 23px; margin-bottom: 3px; }
+        .qt-action[aria-pressed="true"] { color: #ff75b4; }
+        .qt-comments { position: absolute; inset: auto 0 0 0; max-height: 72%; overflow-y: auto; background: #141421; border-radius: 20px 20px 0 0; padding: 16px; z-index: 5; }
+        .qt-comments.hidden { display: none; }
+        .qt-comment-list { max-height: 30dvh; overflow-y: auto; }
+        @media (max-width: 640px) { #community-videos { height: 76dvh; } }
+
+        .qt-hashtag-search { display:flex; gap:8px; margin:10px 0; }
+        .qt-hashtag-search input { min-width:0; flex:1; border:1px solid #52525b; border-radius:18px; padding:9px 12px; color:white; background:#18181b; }
+        .qt-hashtag-search button { border:1px solid #52525b; border-radius:18px; padding:7px 12px; color:white; background:#27272a; }
+        body.qt-feed-active .qt-hashtag-search { position:absolute; z-index:15; top: max(74px, env(safe-area-inset-top)); left:12px; right:12px; margin:0; }
+        body.qt-feed-active #video-feed-message { top:125px; }
+        /* Mobile-first immersive feed: controls float over videos instead of pushing them down. */
+        body.qt-feed-active { overflow: hidden; }
+        body.qt-feed-active > header, body.qt-feed-active > footer { display: none; }
+        body.qt-feed-active > main { display: block; padding: 0; overflow: hidden; height: 100dvh; min-height: 0; }
+        body.qt-feed-active #view-feed { display: block; position: relative; width: 100%; max-width: none; height: 100dvh; padding: 0; margin: 0; }
+        body.qt-feed-active #community-videos { position: absolute; inset: 0; height: 100%; width: 100%; max-height: none; border-radius: 0; margin: 0; }
+        /* Each swipe snaps to a complete full-screen video; its controls remain overlaid. */
+        body.qt-feed-active .qt-video-card { height: 100dvh; min-height: 100dvh; }
+        body.qt-feed-active #community-videos > * { margin-top: 0 !important; margin-bottom: 0 !important; }
+        body.qt-feed-active .qt-video-card { height: 100%; min-height: 100%; }
+        body.qt-feed-active .qt-video-card video { width: 100%; height: 100%; object-fit: cover; object-position: center; }
+        body.qt-feed-active .qt-feed-top { position: absolute; z-index: 12; top: 0; left: 0; right: 0; padding: max(14px, env(safe-area-inset-top)) 14px 12px; background: linear-gradient(rgba(0,0,0,.75),transparent); pointer-events: none; }
+        body.qt-feed-active .qt-feed-top button { pointer-events: auto; }
+        body.qt-feed-active .qt-feed-intro { display: none; }
+        body.qt-feed-active .qt-feed-upload { position: absolute; z-index: 12; bottom: max(15px, env(safe-area-inset-bottom)); left: 12px; width: auto; padding: 10px 15px; border-radius: 24px; font-size: 13px; box-shadow: 0 3px 20px #0009; }
+        body.qt-feed-active .qt-feed-list-title { display: none; }
+        body.qt-feed-active #video-feed-message { position: absolute; z-index: 11; top: 75px; left: 15px; right: 15px; margin: 0; pointer-events: none; text-shadow: 0 1px 5px black; }
+        body.qt-feed-active #upload-panel:not(.hidden) { position: absolute; z-index: 20; top: 68px; bottom: 66px; left: 12px; right: 12px; overflow-y: auto; margin: 0; box-shadow: 0 0 0 100vmax rgba(0,0,0,.72); }
+        body.qt-feed-active .qt-video-info { bottom: 75px; }
+        body.qt-feed-active .qt-video-actions { bottom: 75px; }
+        @media (min-width: 700px) { body.qt-feed-active #view-feed { max-width: 520px; margin: auto; } }
+
+        /* Mobile action rail stays inside the visible viewport on every video. */
+        body.qt-feed-active .qt-video-actions {
+            top: max(78px, env(safe-area-inset-top));
+            bottom: max(92px, env(safe-area-inset-bottom));
+            right: 10px;
+            justify-content: center;
+            gap: clamp(6px, 1.4dvh, 13px);
+            z-index: 4;
+            max-height: none;
+        }
+        body.qt-feed-active .qt-action {
+            min-width: 62px;
+            min-height: 54px;
+            padding: 6px;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body.qt-feed-active .qt-video-info { bottom: max(94px, env(safe-area-inset-bottom)); }
+        body.qt-feed-active .qt-comments { z-index: 8; }
+        @media (max-height: 650px) {
+            body.qt-feed-active .qt-video-actions { top: 55px; bottom: 65px; gap: 3px; }
+            body.qt-feed-active .qt-action { min-height: 44px; padding: 3px 5px; }
+            body.qt-feed-active .qt-action i { font-size: 18px; margin-bottom: 1px; }
+        }
+
+        /* Minimal outlined actions and accessible, compact reaction chooser */
+        body.qt-feed-active .qt-video-actions { top: 90px; bottom: 95px; right: 9px; gap: 12px; }
+        body.qt-feed-active .qt-action { min-width: 52px; min-height: 46px; border: 0; background: transparent; padding: 4px; border-radius: 12px; text-shadow: 0 2px 5px #000; }
+        body.qt-feed-active .qt-action i { font-size: 26px; -webkit-text-stroke: .3px currentColor; }
+        .qt-video-actions .qt-action:not(.qt-sound) i.fa-regular { font-weight: 400; }
+        .qt-video-actions .qt-action[aria-pressed="true"] { color: #2799ff; }
+        .qt-video-actions .qt-action.qt-love[aria-pressed="true"] { color: #ff3c65; }
+        .qt-video-actions .qt-action.qt-other[aria-pressed="true"] { color: #ffc34b; }
+        .qt-reaction-picker { position: absolute; right: 52px; top: 0; display: flex; gap: 3px; padding: 7px; border-radius: 28px; background: rgba(18,18,28,.95); border: 1px solid #555; z-index: 18; box-shadow: 0 4px 16px #000b; }
+        .qt-reaction-picker button { background: transparent; border: 0; font-size: 24px; padding: 4px; min-width: 36px; min-height: 44px; touch-action: manipulation; }
+        .qt-follow { position: absolute; bottom: max(68px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); z-index: 6; border: 1px solid #fff9; border-radius: 8px; background: #131320d9; color: #fff; padding: 9px 18px; font-size: 13px; font-weight: 700; min-width: 108px; }
+        .qt-follow[aria-pressed="true"] { border-color: #ff4a99; color: #ff8bbf; }
+        .qt-follow:disabled { opacity: .65; }
+        body.qt-feed-active .qt-video-info { bottom: max(116px, env(safe-area-inset-bottom)); }
+        @media(max-width: 400px) { .qt-reaction-picker { right: 45px; gap: 0; padding: 4px; } .qt-reaction-picker button { min-width: 32px; font-size: 21px; padding: 2px; } }
+
+/* Qué tal social expansion (after login only). Existing onboarding is unchanged. */
+.qt-social-nav{position:absolute;z-index:24;top:max(55px,env(safe-area-inset-top));left:10px;display:flex;gap:7px;flex-wrap:wrap;max-width:calc(100% - 85px)}
+.qt-social-nav button,.qt-creator-link{border-radius:20px;background:#141421d9;border:1px solid #ffffff55;padding:7px 10px;color:#fff;font-size:12px;font-weight:700}
+.qt-social-panel{position:fixed;z-index:60;inset:0;background:#080812;color:white;overflow:auto;padding:24px 16px max(30px,env(safe-area-inset-bottom))}
+.qt-social-panel.hidden{display:none}
+.qt-social-inner{max-width:560px;margin:auto;display:grid;gap:14px}
+.qt-social-panel input,.qt-social-panel textarea{width:100%;background:#171723;color:white;border:1px solid #646477;border-radius:12px;padding:11px;font-size:14px}
+.qt-social-btn{background:#22d3ee;color:#050508;border-radius:12px;padding:10px 14px;font-weight:700;font-size:13px}
+.qt-social-secondary{background:#242435;border:1px solid #555;color:white;border-radius:12px;padding:9px 12px;font-size:13px}
+.qt-social-card{background:#151521;border:1px solid #37374b;border-radius:16px;padding:14px;display:grid;gap:8px}
+.qt-social-avatar{height:54px;width:54px;border-radius:50%;object-fit:cover;background:#29293a}
+.qt-social-mini{font-size:12px;color:#b5b5cb}
+.qt-social-error{color:#ff9bba;font-size:12px;white-space:pre-wrap}
+.qt-social-nav button:focus-visible,.qt-social-btn:focus-visible,.qt-social-secondary:focus-visible{outline:2px solid #00f0ff;outline-offset:2px}
+@media(prefers-reduced-motion:reduce){.qt-social-nav *, .qt-social-panel *{animation:none!important}}
+
+/* Compact mobile feed layout, Nov 24: preserve full-viewport video. */
+body.qt-feed-active #quetal-install-guide,
+body.qt-feed-active #quetal-install-banner { display:none !important; }
+body.qt-feed-active .qt-feed-top {
+  top:0; padding: max(5px, env(safe-area-inset-top)) 10px 0;
+  align-items:flex-start; min-height:36px;
+}
+body.qt-feed-active .qt-feed-top h2 {font-size:15px;line-height:22px;white-space:nowrap;}
+body.qt-feed-active .qt-feed-top #feed-welcome {display:none;}
+body.qt-feed-active .qt-feed-top button {padding:5px 9px;font-size:11px;}
+body.qt-feed-active .qt-social-nav {
+  top:max(37px, calc(env(safe-area-inset-top) + 34px)); left:10px;right:10px;
+  max-width:none; flex-wrap:nowrap; gap:5px;
+}
+body.qt-feed-active .qt-social-nav button {padding:5px 8px;font-size:11px;white-space:nowrap;}
+body.qt-feed-active .qt-hashtag-search {
+  top:max(72px, calc(env(safe-area-inset-top) + 69px)); left:10px;right:10px;gap:6px;
+}
+body.qt-feed-active .qt-hashtag-search input {font-size:13px;padding:7px 10px;border-radius:13px;height:36px;}
+body.qt-feed-active .qt-hashtag-search button {font-size:12px;padding:5px 10px;border-radius:13px;height:36px;}
+body.qt-feed-active #video-feed-message {top:113px;}
+body.qt-feed-active .qt-video-info {
+  bottom:max(63px, calc(env(safe-area-inset-bottom) + 55px));
+  left:10px;right:80px;font-size:12px;
+}
+body.qt-feed-active .qt-video-info .qt-creator-link {padding:5px 8px;font-size:12px;}
+body.qt-feed-active .qt-video-info p {margin-top:2px;margin-bottom:2px;font-size:12px;line-height:1.3;}
+body.qt-feed-active .qt-video-info .qt-video-views {margin-top:2px;}
+body.qt-feed-active .qt-follow {bottom:max(52px, calc(env(safe-area-inset-bottom) + 45px));padding:6px 12px;}
+body.qt-feed-active .qt-feed-upload {bottom:max(8px,env(safe-area-inset-bottom));padding:8px 13px;font-size:12px;}
+body.qt-feed-active .qt-video-actions {top:120px;bottom:70px;right:5px;gap:5px;}
+body.qt-feed-active .qt-action {min-height:43px;min-width:49px;padding:2px;}
+body.qt-feed-active .qt-action i {font-size:23px;}
+@media(max-width:360px) {body.qt-feed-active .qt-social-nav button{font-size:10px;padding:5px 6px;}}
+
+    
+/* Nov 24 feed refinement: three distinct, nonoverlapping top rows. */
+body.qt-feed-active .qt-feed-top {
+  top:0; left:0; right:0; height:40px; min-height:40px;
+  padding:5px 12px 0; display:flex; align-items:flex-start;
+  background:linear-gradient(180deg,rgba(0,0,0,.82),rgba(0,0,0,.25));
+}
+body.qt-feed-active .qt-feed-top h2 {font-size:17px;line-height:26px;letter-spacing:-.3px;}
+body.qt-feed-active .qt-feed-top button {font-size:12px;padding:5px 10px;line-height:18px;}
+body.qt-feed-active .qt-social-nav {
+  top:41px;left:10px;right:10px;max-width:none;
+  display:flex;flex-wrap:nowrap;gap:7px;align-items:center;
+}
+body.qt-feed-active .qt-social-nav button {
+  font-size:13px;line-height:19px;padding:5px 10px;
+  white-space:nowrap;border-radius:17px;
+}
+body.qt-feed-active .qt-hashtag-search {
+  top:86px;left:10px;right:10px;gap:6px;margin:0;
+}
+body.qt-feed-active .qt-hashtag-search input,
+body.qt-feed-active .qt-hashtag-search button {height:35px;font-size:13px;}
+body.qt-feed-active #video-feed-message {top:124px;}
+body.qt-feed-active .qt-video-info {
+  left:9px;right:83px;bottom:max(69px,env(safe-area-inset-bottom));
+  font-size:12px;max-width:calc(100% - 92px);
+}
+body.qt-feed-active .qt-video-info .qt-creator-link {padding:4px 7px;font-size:12px;}
+body.qt-feed-active .qt-video-info p {font-size:12px;line-height:1.25;margin:1px 0;}
+body.qt-feed-active .qt-video-info .qt-video-views {margin-top:1px;}
+body.qt-feed-active .qt-follow {bottom:max(43px,env(safe-area-inset-bottom));padding:5px 10px;}
+body.qt-feed-active .qt-feed-upload {left:8px;bottom:max(5px,env(safe-area-inset-bottom));padding:7px 11px;}
+@media(max-width:380px) {
+ body.qt-feed-active .qt-social-nav {gap:4px;}
+ body.qt-feed-active .qt-social-nav button {font-size:12px;padding:5px 7px;}
+ body.qt-feed-active .qt-feed-top h2 {font-size:16px;}
+}
+
+/* Immersive edge-to-edge feed, with readable controls floating over the video. */
+body.qt-feed-active,body.qt-feed-active > main,body.qt-feed-active #view-feed,
+body.qt-feed-active #community-videos {background:#000;}
+body.qt-feed-active .qt-feed-top {
+  top:0; height:37px; min-height:37px; padding:3px 12px 0;
+  background:transparent; align-items:flex-start;
+}
+body.qt-feed-active .qt-feed-top h2 {font-size:18px;line-height:28px;color:#67e8f9;text-shadow:0 2px 6px #000,0 0 8px #000;}
+body.qt-feed-active .qt-feed-top button {background:rgba(0,0,0,.3);text-shadow:0 1px 3px #000;}
+body.qt-feed-active .qt-social-nav {top:39px;left:10px;right:10px;gap:7px;z-index:24;}
+body.qt-feed-active .qt-social-nav button {font-size:13px;padding:6px 10px;background:rgba(9,9,20,.55);border:1px solid #ffffff70;text-shadow:0 1px 3px #000;}
+body.qt-feed-active .qt-hashtag-search {top:83px;left:10px;right:10px;gap:6px;}
+body.qt-feed-active .qt-hashtag-search input,body.qt-feed-active .qt-hashtag-search button {height:36px;background:rgba(9,9,20,.65);}
+body.qt-feed-active #video-feed-message {top:122px;}
+body.qt-feed-active .qt-video-info {bottom:max(61px,env(safe-area-inset-bottom));left:10px;right:86px;max-width:calc(100% - 96px);background:transparent;text-shadow:0 2px 5px #000,0 0 9px #000;}
+body.qt-feed-active .qt-video-info .qt-creator-link {background:transparent;border:0;border-radius:0;padding:0;color:#fff;font-size:13px;text-shadow:0 2px 5px #000;}
+body.qt-feed-active .qt-video-info p {font-size:12px;line-height:1.25;margin:1px 0;}
+body.qt-feed-active .qt-video-shade {height:28%;background:linear-gradient(transparent,rgba(0,0,0,.38));}
+body.qt-feed-active .qt-follow {bottom:max(44px,env(safe-area-inset-bottom));background:rgba(0,0,0,.35);border:0;text-shadow:0 1px 4px #000;}
+body.qt-feed-active .qt-feed-upload {bottom:max(5px,env(safe-area-inset-bottom));left:8px;}
+@media(max-width:380px) {body.qt-feed-active .qt-social-nav {gap:4px;}body.qt-feed-active .qt-social-nav button {font-size:12px;padding:6px 7px;}}
+
+
+
+/* Chat and People themes, without changing the video feed. */
+#qt-social-panel.qt-theme-neon{background:radial-gradient(circle at 85% 4%,#512078 0%,#170b2a 37%,#080611 85%);color:#fff}
+#qt-social-panel.qt-theme-light{background:#f7f5fb;color:#171123}
+#qt-social-panel.qt-theme-light .qt-social-card,#qt-social-panel.qt-theme-light .qt-chat-item{background:#fff;color:#171123;border-color:#ddd5e8}
+#qt-social-panel.qt-theme-light .qt-chat-messages{background:#eeeaf4}
+#qt-social-panel.qt-theme-light .qt-theirs .qt-message-bubble{background:#ded6eb;color:#171123}
+#qt-social-panel.qt-theme-light .qt-social-mini,#qt-social-panel.qt-theme-light .qt-chat-preview,#qt-social-panel.qt-theme-light .qt-chat-status{color:#625a70}
+#qt-social-panel.qt-theme-light input,#qt-social-panel.qt-theme-light textarea{background:#fff;color:#171123;border-color:#a69ab8}
+#qt-social-panel.qt-theme-light .qt-social-secondary{background:#ede8f4;color:#171123}
+#qt-social-panel.qt-theme-neon .qt-social-card,#qt-social-panel.qt-theme-neon .qt-chat-item{background:#21132f;border-color:#75429b}
+#qt-social-panel.qt-theme-neon .qt-chat-messages{background:#100a1c}
+#qt-social-panel.qt-theme-neon .qt-mine .qt-message-bubble{background:#9d00ff;color:#fff}
+.qt-theme-picker{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:2px 0 12px;font-size:12px}
+.qt-theme-picker select{background:#21132f;color:#fff;border:1px solid #a56ce1;border-radius:10px;padding:8px}
+.qt-online-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#24dc89;margin-right:5px}
+.qt-presence-line{font-size:12px;color:#c8b2e9}
+.qt-theme-light .qt-presence-line{color:#625a70}
+
+/* Qué Tal Chat upgrade: mobile-first conversations and message bubbles. */
+.qt-chat-list{display:grid;gap:10px;margin-top:12px}
+.qt-chat-item{width:100%;display:flex;align-items:center;gap:12px;text-align:left;background:#151521;border:1px solid #37374b;border-radius:16px;padding:12px;color:#fff;min-height:76px}
+.qt-chat-item:focus-visible{outline:2px solid #22d3ee}
+.qt-chat-item.qt-unread{border-color:#22d3ee88;background:#19232c}
+.qt-chat-info{flex:1;min-width:0}.qt-chat-name{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qt-unread .qt-chat-name{font-weight:800}.qt-chat-preview{display:block;color:#a8a8bd;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:4px}
+.qt-chat-side{display:flex;flex-direction:column;align-items:end;gap:7px;flex-shrink:0}.qt-chat-count{display:inline-flex;min-width:23px;height:23px;padding:0 6px;border-radius:20px;background:#22d3ee;color:#050508;align-items:center;justify-content:center;font-size:12px;font-weight:800}
+.qt-chat-messages{display:flex;flex-direction:column;gap:10px;min-height:180px;max-height:54dvh;overflow-y:auto;padding:14px 8px;background:#0b0e18;border-radius:14px;overscroll-behavior:contain}
+.qt-message-row{display:flex;width:100%}.qt-message-row.qt-mine{justify-content:flex-end}.qt-message-row.qt-theirs{justify-content:flex-start}
+.qt-message-bubble{max-width:84%;min-width:70px;padding:10px 12px;border-radius:17px;overflow-wrap:anywhere;box-shadow:0 2px 8px #0004}
+.qt-mine .qt-message-bubble{background:#22d3ee;color:#061018;border-bottom-right-radius:4px}.qt-theirs .qt-message-bubble{background:#303241;color:#fff;border-bottom-left-radius:4px}
+.qt-message-text{font-size:14px;line-height:1.45;white-space:pre-wrap}.qt-message-time{font-size:10px;text-align:right;opacity:.75;margin-top:5px}
+.qt-chat-header{display:flex;align-items:center;gap:10px}.qt-chat-header strong{font-size:16px}.qt-chat-composer textarea{min-height:64px;resize:vertical}
+.qt-chat-status{font-size:11px;color:#a8a8bd}
+
+
+/* Chat selection and location cards */
+.qt-message-bubble,.qt-message-bubble *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.qt-message-bubble.qt-selected{outline:3px solid #22d3ee;outline-offset:2px}
+.qt-location-card{display:grid;gap:8px;width:min(240px,65vw);color:inherit;text-decoration:none}.qt-location-card iframe{width:100%;height:145px;border:0;border-radius:10px;pointer-events:none}.qt-location-card a{color:inherit;text-decoration:underline;font-weight:700}
+/* Nov 25 media and avatar upgrade */
+.qt-social-avatar.qt-letter-avatar{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;background:linear-gradient(135deg,#9d00ff,#5421a9);border:2px solid #d7a4ff;color:white;font-weight:800;font-size:22px;box-shadow:0 0 12px #9d00ff55}
+.qt-media-controls{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}.qt-media-controls button{background:#40205f;color:#fff;border:1px solid #ae6dea;border-radius:12px;padding:9px 12px;font-size:13px}
+.qt-media-preview{max-width:100%;max-height:290px;border-radius:12px}.qt-status-item{border-bottom:1px solid #75429b;padding:10px 0}.qt-status-item img{max-width:100%;max-height:300px;border-radius:12px}
+.qt-voice-indicator{font-size:12px;color:#e9c8ff}.qt-theme-light .qt-media-controls button{background:#eee2fa;color:#301149}
+
+.qt-conversation{padding:0!important;overflow:hidden!important;height:100dvh;bottom:auto}
+.qt-conversation .qt-social-inner{height:100%;display:flex;flex-direction:column;gap:0;max-width:650px}
+.qt-conversation .qt-social-inner>div:first-child{display:none}
+.qt-conversation #qt-social-body{flex:1;min-height:0;display:flex;flex-direction:column}
+.qt-chat-screen{display:flex;flex-direction:column;flex:1;min-height:0;padding:8px;gap:5px;padding-bottom:max(8px,env(safe-area-inset-bottom))}
+.qt-chat-screen .qt-chat-header{flex-shrink:0;padding:5px;gap:8px}.qt-chat-header>div:nth-last-child(2){flex:1}.qt-chat-header .qt-social-avatar{width:40px;height:40px}
+.qt-chat-screen .qt-chat-messages{flex:1;min-height:0;max-height:none;border-radius:0}.qt-chat-screen .qt-chat-status{display:none}
+.qt-composer,.qt-pill{display:flex;align-items:flex-end;gap:3px}.qt-pill{flex:1;min-width:0;background:#302438;border-radius:26px;padding:3px 5px;align-items:center}.qt-pill textarea{flex:1;min-width:0;width:0!important;background:transparent!important;border:0!important;resize:none;padding:8px 2px!important;font-size:16px!important;max-height:120px;outline:none}.qt-icon{width:36px;height:42px;flex-shrink:0;color:inherit;font-size:19px;background:transparent;border:0}.qt-icon[hidden]{display:none}.qt-send{background:#22d3ee;color:#050508;border-radius:50%;width:46px;height:46px;touch-action:none}.qt-tray{max-height:35dvh;overflow:auto;display:flex;flex-wrap:wrap;gap:6px;padding:8px;background:#21132f;border-radius:14px}.qt-tray.hidden{display:none}.qt-tray .qt-media-preview{max-height:22dvh}.qt-theme-light .qt-pill,.qt-theme-light .qt-tray{background:#e5ddef}.qt-chat-screen .qt-voice-indicator:empty{display:none}
+
+.qt-chat-header{position:relative}.qt-chat-header .qt-chat-popup{position:absolute;right:4px;top:100%;z-index:40;width:min(260px,85vw);background:#241632;border:1px solid #75508e;border-radius:12px;box-shadow:0 8px 24px #0009;overflow:hidden;display:grid}.qt-chat-popup.hidden{display:none!important}.qt-chat-popup button{border:0;border-radius:0;text-align:left;background:transparent;padding:13px 16px;font-size:15px}.qt-chat-header .qt-avatar-button{flex:0 0 auto;background:none;border:0;padding:0}.qt-chat-header [role=button]{flex:1;min-width:0;cursor:pointer}.qt-photo-dialog{background:#160d23;color:white;border:0;border-radius:14px;padding:16px;max-width:94vw;margin:auto}.qt-photo-dialog::backdrop{background:#000d}.qt-photo-dialog img{display:block;max-width:85vw;max-height:75dvh;object-fit:contain;margin-top:12px}.qt-theme-light .qt-chat-popup{background:#fff}.qt-theme-light .qt-chat-popup button{color:#171123}
+/* Qué Tal immersive private media viewer */
+.qt-photo-dialog{position:fixed!important;inset:0!important;width:100vw!important;height:100dvh!important;max-width:none!important;max-height:none!important;margin:0!important;padding:0!important;border-radius:0!important;background:#050309!important;overflow:hidden!important;box-sizing:border-box!important}
+.qt-photo-dialog[open]{display:flex!important;flex-direction:column;align-items:center;justify-content:center}
+.qt-photo-dialog::backdrop{background:#000!important}
+.qt-photo-dialog .qt-viewer-bar{position:absolute;top:0;left:0;right:0;z-index:2;display:flex;align-items:center;justify-content:space-between;padding:max(14px,env(safe-area-inset-top)) 16px 12px;background:linear-gradient(#000b,transparent);color:#fff}
+.qt-photo-dialog .qt-viewer-bar button{border:1px solid #ffffff55;border-radius:50%;width:42px;height:42px;background:#241632;color:#fff;font-size:24px}
+.qt-photo-dialog .qt-viewer-content{width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:70px 12px 45px;box-sizing:border-box}
+.qt-photo-dialog .qt-viewer-content img{display:block;width:auto!important;height:auto!important;max-width:100%!important;max-height:100%!important;object-fit:contain!important;margin:0!important;border-radius:0!important}
+.qt-photo-dialog .qt-viewer-content .qt-social-avatar{width:min(78vw,350px)!important;height:min(78vw,350px)!important;font-size:clamp(70px,22vw,140px)!important}
+.qt-private-media img,.qt-photo-dialog img{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.qt-notification-btn{font-size:12px;border:1px solid #22d3ee77;border-radius:12px;padding:9px 12px;background:#21132f;color:#fff}
+.qt-own-avatar-wrap{position:relative;display:inline-flex;flex-shrink:0;cursor:pointer}.qt-profile-camera-badge{position:absolute;right:-7px;bottom:-5px;width:29px;height:29px;border-radius:50%;border:2px solid #151521;background:#22d3ee;color:#101020;font-size:15px;display:grid;place-items:center}
+</style>
+</head>
+<body class="bg-darkbg text-white min-h-screen flex flex-col justify-between">
+
+<div id="quetal-install-banner" style="position:fixed;bottom:18px;left:12px;right:12px;z-index:9999;display:none;background:#101020;color:white;padding:16px;border:1px solid #00f0ff;border-radius:16px;text-align:center;box-shadow:0 0 20px #00f0ff55">
+  <strong>Get the Qué tal App 💜</strong>
+  <p style="font-size:13px;margin:8px 0">Install Qué tal on your phone and join our video community!</p>
+  <button id="quetal-install-btn" type="button" style="background:linear-gradient(90deg,#00f0ff,#a000ff);color:#000;font-weight:bold;padding:12px 22px;border:0;border-radius:12px">Install Qué tal App</button>
+  <button id="quetal-install-close" type="button" aria-label="Close" style="margin-left:12px;color:white;background:transparent;border:0;font-size:22px">×</button>
+</div>
+<script>
+(function () {
+  let installPrompt = null;
+  const banner = document.getElementById('quetal-install-banner');
+  const installButton = document.getElementById('quetal-install-btn');
+  const closeButton = document.getElementById('quetal-install-close');
+
+  window.addEventListener('beforeinstallprompt', function (event) {
+    event.preventDefault();
+    installPrompt = event;
+    if (!document.body.classList.contains('qt-feed-active')) banner.style.display = 'block';
+  });
+
+  installButton.addEventListener('click', async function () {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    await installPrompt.userChoice;
+    installPrompt = null;
+    banner.style.display = 'none';
+  });
+
+  closeButton.addEventListener('click', function () {
+    banner.style.display = 'none';
+  });
+
+  window.addEventListener('appinstalled', function () {
+    banner.style.display = 'none';
+  });
+})();
+</script>
+<section id="quetal-install-guide" style="background:#101020;color:white;padding:18px;margin:12px;border:1px solid #00f0ff;border-radius:16px;text-align:center;">
+  <h2 style="font-size:20px;font-weight:bold;margin-bottom:12px;">Get the Qué tal App 💜</h2>
+  <p style="margin-bottom:12px;">Install Qué tal on your phone and join our video community!</p>
+  <div style="margin-bottom:12px;">
+    <strong>🤖 Android</strong>
+    <p>Open this website in Chrome. Tap "Install Qué tal App" when it appears, or open Chrome's menu (⋮) and choose "Install app".</p>
+  </div>
+  <div>
+    <strong>🍎 iPhone</strong>
+    <p>Open this website in Safari. Tap Share, choose "Add to Home Screen", keep "Open as Web App" enabled, then tap Add.</p>
+  </div>
+</section>
+    <script>
+(function () {
+  const guide = document.getElementById('quetal-install-guide');
+  if (!guide) return;
+  guide.innerHTML = `
+    <h2 style="font-size:18px;font-weight:bold;margin-bottom:10px;">Get the Qué tal App 💜</h2>
+    <p style="font-size:16px;line-height:1.5;margin-bottom:8px;"><strong>🤖 Android:</strong> Open in Chrome. Tap "Install Qué tal App", or choose "Install app" from Chrome's menu.</p>
+    <p style="font-size:16px;line-height:1.5;"><strong>🍎 iPhone:</strong> Open in Safari. Tap Share → Add to Home Screen → Add.</p>
+  `;
+  guide.style.padding = '12px';
+  guide.style.margin = '8px 0';
+})();
+    </script>
+
+    <!-- Top Global Header -->
+    <header class="w-full bg-cardbg/80 backdrop-blur-md border-b border-zinc-800 px-6 py-4 flex justify-between items-center z-30">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-neoncian to-neonpurple flex items-center justify-center neon-glow-cyan">
+                <i class="fa-solid fa-bolt text-black text-xl font-black"></i>
+            </div>
+            <div>
+                <h1 class="font-extrabold text-lg tracking-wider text-glow-cyan" data-i18n="brand">Qué tal</h1>
+                <p class="text-[10px] text-zinc-400 uppercase tracking-widest font-semibold" data-i18n="tagline">Global Social Ecosystem</p>
+            </div>
+        </div>
+
+        <!-- Global Language Selector Dropdown -->
+        <div class="flex items-center space-x-3">
+            <div class="relative">
+                <select id="global-lang-select" onchange="changeLanguage(this.value)" class="bg-zinc-900 border border-zinc-700 hover:border-neoncian text-xs font-bold text-white rounded-xl px-3.5 py-2 focus:outline-none transition cursor-pointer appearance-none pr-8">
+                    <option value="tr">🇹🇷 Türkçe (N'aber)</option>
+                    <option value="en">🇬🇧 English</option>
+                    <option value="es">🇪🇸 Español</option>
+                    <option value="pt">🇵🇹 Português</option>
+                    <option value="fr">🇫🇷 Français</option>
+                    <option value="zh">🇨🇳 中文 (Chinese)</option>
+                    <option value="ja">🇯🇵 日本語 (Japanese)</option>
+                    <option value="de">🇩🇪 Deutsch</option>
+                    <option value="it">🇮🇹 Italiano</option>
+                    <option value="ar">🇸🇦 العربية (Arabic)</option>
+                    <option value="ru">🇷🇺 Русский (Russian)</option>
+                    <option value="ko">🇰🇷 한국어 (Korean)</option>
+                </select>
+                <i class="fa-solid fa-globe absolute right-3 top-3 text-zinc-400 text-xs pointer-events-none"></i>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container: Registration / Onboarding / Platform -->
+    <main class="flex-1 flex items-center justify-center p-4 relative overflow-hidden">
+
+        <!-- STEP 1: REGISTRATION PORTAL -->
+        <div id="view-registration" class="w-full max-w-4xl grid grid-cols-1 lg:grid-cols-2 gap-8 items-center py-8">
+            <!-- Left Column: Welcome -->
+            <div class="space-y-6">
+                <div>
+                    <span class="bg-neonpurple/20 text-purple-300 border border-neonpurple/40 text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider" data-i18n="launch_badge">🚀 Global Lansman Aktif</span>
+                    <h2 class="text-3xl lg:text-4xl font-extrabold text-white mt-3 leading-tight">
+                        <span class="text-glow-cyan" data-i18n="hero_title_1">Qué tal</span> <span data-i18n="hero_title_2">ile Dünyaya N'aber De!</span>
+                    </h2>
+                    <p class="text-sm text-zinc-400 mt-2" data-i18n="hero_desc">
+                        Yepyeni dikey akış, anlık coin ekonomisi ve yapay zeka destekli içerik keşfi seni bekliyor. Hemen kaydol, yerini al.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Right Column: Registration Form -->
+            <div class="bg-cardbg border border-neonpurple/50 rounded-3xl p-6 lg:p-8 neon-glow-purple relative">
+                <h3 id="auth-title" class="text-xl font-extrabold text-glow-cyan mb-1" data-i18n="form_title">Hesap Oluştur</h3>
+                <p class="text-xs text-zinc-400 mb-6" data-i18n="form_subtitle">Birkaç saniye içinde Qué tal ekosistemine katılın.</p>
+
+                <form id="auth-form" onsubmit="handleRegistration(event)" class="space-y-4">
+                    <div>
+                        <label class="text-xs text-zinc-300 font-medium mb-1 block" data-i18n="label_username">Kullanıcı Adı</label>
+                        <div class="relative">
+                            <i class="fa-solid fa-at absolute left-3.5 top-3.5 text-zinc-400 text-xs"></i>
+                            <input type="text" id="reg-username" required placeholder="ornek_kullanici" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl py-2.5 pl-10 pr-4 text-xs text-white focus:outline-none focus:border-neoncian transition">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="text-xs text-zinc-300 font-medium mb-1 block" data-i18n="label_email">E-posta Adresi</label>
+                        <div class="relative">
+                            <i class="fa-solid fa-envelope absolute left-3.5 top-3.5 text-zinc-400 text-xs"></i>
+                            <input type="email" id="reg-email" required placeholder="adiniz@domain.com" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl py-2.5 pl-10 pr-4 text-xs text-white focus:outline-none focus:border-neoncian transition">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="text-xs text-zinc-300 font-medium mb-1 block" data-i18n="label_password">Şifre</label>
+                        <div class="relative">
+                            <i class="fa-solid fa-lock absolute left-3.5 top-3.5 text-zinc-400 text-xs"></i>
+                            <input type="password" id="reg-password" required placeholder="••••••••" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl py-2.5 pl-10 pr-4 text-xs text-white focus:outline-none focus:border-neoncian transition">
+                        </div>
+                        <div id="qt-password-rules" class="mt-2 text-xs text-zinc-400" aria-live="polite">
+                            <p class="mb-1">Password requirements (for new accounts and password resets):</p>
+                            <div data-rule="length">○ At least 12 characters</div>
+                            <div data-rule="lower">○ One lowercase letter (a–z)</div>
+                            <div data-rule="upper">○ One uppercase letter (A–Z)</div>
+                            <div data-rule="number">○ One number (0–9)</div>
+                            <div data-rule="symbol">○ One symbol (!, @, #, etc.)</div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="text-xs text-zinc-300 font-medium mb-1 block" data-i18n="label_lang">Başlangıç Dili</label>
+                        <select id="reg-lang" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl py-2.5 px-3 text-xs text-white focus:outline-none focus:border-neonpurple transition">
+                            <option value="tr">🇹🇷 Türkçe (N'aber)</option>
+                            <option value="en">🇬🇧 English</option>
+                            <option value="es">🇪🇸 Español</option>
+                            <option value="pt">🇵🇹 Português</option>
+                            <option value="fr">🇫🇷 Français</option>
+                            <option value="zh">🇨🇳 中文 (Chinese)</option>
+                            <option value="ja">🇯🇵 日本語 (Japanese)</option>
+                            <option value="de">🇩🇪 Deutsch</option>
+                        </select>
+                    </div>
+
+                    <button id="auth-submit" type="submit" class="w-full bg-gradient-to-r from-neoncian to-neonpurple text-black font-extrabold py-3.5 rounded-xl text-xs shadow-lg neon-glow-cyan hover:opacity-90 transition active:scale-95 uppercase tracking-wider mt-2">
+                        <span data-i18n="btn_register">HESAP OLUŞTUR & BAŞLA 🚀</span>
+                    </button>
+                    <p id="auth-message" role="status" aria-live="polite" class="text-xs text-cyan-300 hidden"></p>
+                    <div class="flex flex-wrap gap-3 justify-center text-xs pt-2">
+                        <button type="button" id="login-toggle" onclick="setAuthMode('login')" class="text-cyan-300 underline">Already registered? Log in</button>
+                        <button type="button" id="signup-toggle" onclick="setAuthMode('signup')" class="text-cyan-300 underline hidden">Create an account</button>
+                        <button type="button" id="reset-toggle" onclick="setAuthMode('reset')" class="text-zinc-300 underline">Forgot password?</button>
+                    </div>
+                </form>
+                <div id="signed-in-bar" class="hidden mt-4 space-y-3">
+                    <p id="signed-in-label" class="text-sm text-emerald-300 break-words"></p>
+                    <button type="button" onclick="signOut()" class="border border-zinc-600 rounded-xl px-4 py-2 text-xs">Log out</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 2: ONBOARDING INTERESTS SELECTION (HIDDEN INITIALLY) -->
+        <div id="view-onboarding" class="w-full max-w-xl bg-cardbg border border-neonpurple rounded-3xl p-6 lg:p-8 neon-glow-purple hidden animate-in fade-in zoom-in duration-300">
+            <div class="text-center mb-6">
+                <span class="bg-neoncian/10 text-neoncian border border-neoncian/30 text-[10px] font-bold px-3 py-1 rounded-full" data-i18n="onboard_badge">Adım 2 / 2 • İlgi Alanları</span>
+                <h2 class="text-2xl font-extrabold text-white mt-2" data-i18n="onboard_title">Neleri İzlemeyi Seversin?</h2>
+                <p class="text-xs text-zinc-400 mt-1" data-i18n="onboard_subtitle">Sana özel akış kurabilmemiz için en az 3 kategori seç.</p>
+            </div>
+
+            <!-- Interests Grid -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
+                <div onclick="toggleInterest(this, 'Music')" class="interest-pill bg-zinc-900 border border-zinc-800 hover:border-neoncian p-4 rounded-2xl text-center cursor-pointer transition flex flex-col items-center justify-center space-y-2">
+                    <i class="fa-solid fa-music text-xl text-neoncian"></i>
+                    <span class="text-xs font-bold" data-i18n="cat_music">Müzik & Dans</span>
+                </div>
+                <div onclick="toggleInterest(this, 'Tech')" class="interest-pill bg-zinc-900 border border-zinc-800 hover:border-neonpurple p-4 rounded-2xl text-center cursor-pointer transition flex flex-col items-center justify-center space-y-2">
+                    <i class="fa-solid fa-microchip text-xl text-neonpurple"></i>
+                    <span class="text-xs font-bold" data-i18n="cat_tech">Teknoloji & AI</span>
+                </div>
+                <div onclick="toggleInterest(this, 'Horror')" class="interest-pill bg-zinc-900 border border-zinc-800 hover:border-neonpink p-4 rounded-2xl text-center cursor-pointer transition flex flex-col items-center justify-center space-y-2">
+                    <i class="fa-solid fa-ghost text-xl text-neonpink"></i>
+                    <span class="text-xs font-bold" data-i18n="cat_horror">Korku & Gizem</span>
+                </div>
+                <div onclick="toggleInterest(this, 'Lifestyle')" class="interest-pill bg-zinc-900 border border-zinc-800 hover:border-yellow-400 p-4 rounded-2xl text-center cursor-pointer transition flex flex-col items-center justify-center space-y-2">
+                    <i class="fa-solid fa-fire text-xl text-yellow-400"></i>
+                    <span class="text-xs font-bold" data-i18n="cat_life">Yaşam & Trend</span>
+                </div>
+                <div onclick="toggleInterest(this, 'Art')" class="interest-pill bg-zinc-900 border border-zinc-800 hover:border-cyan-400 p-4 rounded-2xl text-center cursor-pointer transition flex flex-col items-center justify-center space-y-2">
+                    <i class="fa-solid fa-palette text-xl text-cyan-400"></i>
+                    <span class="text-xs font-bold" data-i18n="cat_art">Sanat & Tasarım</span>
+                </div>
+                <div onclick="toggleInterest(this, 'Comedy')" class="interest-pill bg-zinc-900 border border-zinc-800 hover:border-emerald-400 p-4 rounded-2xl text-center cursor-pointer transition flex flex-col items-center justify-center space-y-2">
+                    <i class="fa-solid fa-face-laugh text-xl text-emerald-400"></i>
+                    <span class="text-xs font-bold" data-i18n="cat_comedy">Mizah & Komedi</span>
+                </div>
+            </div>
+
+            <p id="onboard-message" role="status" class="text-xs text-cyan-300 text-center mb-3"></p>
+            <button onclick="finishOnboarding()" class="w-full bg-gradient-to-r from-neoncian to-neonpurple text-black font-extrabold py-3.5 rounded-xl text-xs shadow-lg neon-glow-cyan hover:opacity-90 transition uppercase tracking-wider">
+                <span data-i18n="btn_enter">QUÉ TAL AKIŞINA BAŞLA 🚀</span>
+            </button>
+        </div>
+
+
+        <!-- STEP 3: VIDEO FEED -->
+        <section id="view-feed" class="hidden w-full max-w-xl py-6 space-y-5" aria-label="Qué tal feed">
+
+            <!-- New features appear ONLY after existing login and interest selection. -->
+            <nav class="qt-social-nav" aria-label="Qué tal member tools">
+              <button type="button" onclick="qtOpenPanel('me')"><i class="fa-regular fa-user"></i> My Profile</button>
+              <button type="button" onclick="qtOpenPanel('people')"><i class="fa-solid fa-magnifying-glass"></i> People</button>
+              <button type="button" onclick="qtOpenPanel('chats')"><i class="fa-regular fa-message"></i> Chat <span id="qt-unread-badge" class="hidden" style="background:#22d3ee;color:#050508;border-radius:999px;padding:2px 6px;margin-left:3px;font-size:11px" aria-label="Unread conversations"></span> <span id="qt-request-badge" class="hidden" style="background:#ff3c65;color:white;border-radius:999px;padding:2px 6px;margin-left:3px;font-size:11px" aria-label="Pending message requests"></span></button>
+            </nav>
+            <div class="qt-feed-top flex items-center justify-between gap-3">
+                <div><h2 class="text-xl font-extrabold text-glow-cyan">Qué tal Feed 🚀</h2>
+                <p id="feed-welcome" class="text-xs text-zinc-400 mt-1"></p></div>
+                <button type="button" onclick="signOut()" class="rounded-xl border border-zinc-600 px-4 py-2 text-xs font-bold">Log out</button>
+            </div>
+            <div class="qt-feed-intro rounded-2xl border border-neonpurple/40 bg-cardbg p-4">
+                <p class="text-sm font-semibold">Welcome to your feed!</p>
+                <p class="text-xs text-zinc-400 mt-2">Swipe up for the next video! Tap a video to pause or play. Use the buttons to like, comment, share, and follow creators.</p>
+                <p id="feed-interests" class="text-xs text-cyan-300 mt-3"></p>
+            </div>
+            <button type="button" onclick="toggleUploadPanel()" class="qt-feed-upload w-full bg-gradient-to-r from-neoncian to-neonpurple text-black font-extrabold rounded-2xl py-4"><i class="fa-solid fa-plus mr-2"></i> Upload Video</button>
+            <section id="upload-panel" class="hidden rounded-2xl border border-neoncian/50 bg-cardbg p-4 space-y-4" aria-label="Upload a video">
+                <h3 class="text-lg font-bold">Post a video to Qué tal</h3>
+                <form id="video-upload-form" onsubmit="uploadVideo(event)" class="space-y-3">
+                    <label class="block text-sm">Choose a video from your phone
+                        <input id="video-file" type="file" accept="video/mp4,video/webm,video/quicktime" required class="block mt-2 w-full text-xs text-zinc-300" onchange="previewSelectedVideo()">
+                    </label>
+                    <div class="qt-media-controls"><button type="button" onclick="document.getElementById('qt-record-video').click()">🎥 Record video</button></div>
+                    <input id="qt-record-video" type="file" accept="video/*" capture="environment" hidden onchange="qtSelectRecordedVideo(this)">
+                    <video id="video-preview" class="hidden w-full max-h-80 rounded-xl bg-black" controls playsinline preload="metadata"></video>
+                    <label class="block text-sm">Caption
+                        <textarea id="video-caption" maxlength="300" required rows="2" placeholder="Tell us about your video…" class="mt-2 w-full rounded-xl bg-zinc-900 border border-zinc-700 p-3 text-white text-sm"></textarea>
+                    </label>
+                    <label class="block text-sm">Category
+                        <select id="video-category" class="mt-2 w-full rounded-xl bg-zinc-900 border border-zinc-700 p-3 text-white">
+                            <option value="Music">Music & Dance</option><option value="Tech">Tech & AI</option><option value="Horror">Horror & Mystery</option><option value="Lifestyle">Lifestyle & Trends</option><option value="Art">Art & Design</option><option value="Comedy">Comedy & Humor</option>
+                        </select>
+                    </label>
+                    <p class="text-xs text-cyan-300">Add hashtags in your caption, for example #music #guyana. Viewers can search by hashtag.</p>
+                    <p class="text-xs text-zinc-400">MP4, WebM or MOV. Maximum 50 MB. Only upload videos you have permission to share. Public posts can be viewed by anyone using Qué tal.</p>
+                    <button id="publish-video-button" type="submit" class="w-full bg-neoncian text-black font-extrabold rounded-xl py-3">Publish Video</button>
+                    <p id="video-upload-message" role="status" aria-live="polite" class="text-xs text-cyan-300"></p>
+                </form>
+            </section>
+            <div class="qt-feed-list-title flex justify-between items-center"><h3 class="font-bold text-lg">Community videos</h3><button type="button" onclick="loadVideos()" class="text-xs text-neoncian underline">Refresh</button></div>
+            <p id="video-feed-message" class="text-xs text-zinc-400">Loading videos…</p>
+            <div id="qt-hashtag-search" class="qt-hashtag-search">
+                <label for="qt-tag-input" class="sr-only">Search video hashtags</label>
+                <input id="qt-tag-input" type="search" placeholder="Search hashtags: #music" maxlength="60" autocomplete="off" aria-label="Search hashtags">
+                <button type="button" id="qt-tag-clear" aria-label="Clear hashtag search">Clear</button>
+            </div>
+            <div id="community-videos"></div>
+        </section>
+
+    </main>
+
+
+    <!-- Separate post-login overlay. No changes to registration, installation or onboarding. -->
+    <section id="qt-social-panel" class="qt-social-panel hidden" aria-label="Member profiles and messages" role="dialog" aria-modal="true">
+      <div class="qt-social-inner">
+        <div class="flex justify-between items-center gap-2"><h2 class="text-xl font-bold text-cyan-300" id="qt-social-title">Qué tal</h2><button class="qt-social-secondary" type="button" onclick="qtBack()">← Back</button></div>
+        <p class="qt-social-error" id="qt-social-message" role="status" aria-live="polite"></p>
+        <div id="qt-social-body"></div>
+      </div>
+    </section>
+    <!-- Footer -->
+    <footer class="w-full bg-cardbg/80 border-t border-zinc-800 px-6 py-3 text-center text-[10px] text-zinc-500">
+        <p>© 2026 Qué tal • Discover, watch and share videos</p>
+    </footer>
+
+    <!-- Multilingual Translations Dictionary -->
+    <script>
+        const translations = {
+            tr: {
+                brand: "Qué tal",
+                tagline: "Global Sosyal Ekosistem",
+                launch_badge: "🚀 Global Lansman Aktif",
+                hero_title_1: "Qué tal",
+                hero_title_2: "ile Dünyaya N'aber De!",
+                hero_desc: "Yepyeni dikey akış, anlık coin ekonomisi ve yapay zeka destekli içerik keşfi seni bekliyor. Hemen kaydol, yerini al.",
+                form_title: "Hesap Oluştur",
+                form_subtitle: "Birkaç saniye içinde Qué tal ekosistemine katılın.",
+                label_username: "Kullanıcı Adı",
+                label_email: "E-posta Adresi",
+                label_password: "Şifre",
+                label_lang: "Başlangıç Dili",
+                btn_register: "HESAP OLUŞTUR & BAŞLA 🚀",
+                onboard_badge: "Adım 2 / 2 • İlgi Alanları",
+                onboard_title: "Neleri İzlemeyi Seversin?",
+                onboard_subtitle: "Sana özel akış kurabilmemiz için en az 3 kategori seç.",
+                cat_music: "Müzik & Dans",
+                cat_tech: "Teknoloji & AI",
+                cat_horror: "Korku & Gizem",
+                cat_life: "Yaşam & Trend",
+                cat_art: "Sanat & Tasarım",
+                cat_comedy: "Mizah & Komedi",
+                btn_enter: "QUÉ TAL AKIŞINA BAŞLA 🚀"
+            },
+            en: {
+                brand: "Qué tal",
+                tagline: "Global Social Ecosystem",
+                launch_badge: "🚀 Global Launch Active",
+                hero_title_1: "Say Hello",
+                hero_title_2: "with Qué tal!",
+                hero_desc: "A brand new vertical feed, instant coin economy, and AI-powered content discovery await you. Register now and claim your spot.",
+                form_title: "Create Account",
+                form_subtitle: "Join the Qué tal ecosystem in seconds.",
+                label_username: "Username",
+                label_email: "Email Address",
+                label_password: "Password",
+                label_lang: "Primary Language",
+                btn_register: "CREATE ACCOUNT & START 🚀",
+                onboard_badge: "Step 2 / 2 • Interests",
+                onboard_title: "What Do You Love Watching?",
+                onboard_subtitle: "Select at least 3 categories to personalize your feed.",
+                cat_music: "Music & Dance",
+                cat_tech: "Tech & AI",
+                cat_horror: "Horror & Mystery",
+                cat_life: "Lifestyle & Trends",
+                cat_art: "Art & Design",
+                cat_comedy: "Comedy & Humor",
+                btn_enter: "ENTER QUÉ TAL FEED 🚀"
+            },
+            es: {
+                brand: "Qué tal",
+                tagline: "Ecosistema Social Global",
+                launch_badge: "🚀 Lanzamiento Global Activo",
+                hero_title_1: "¡Saluda",
+                hero_title_2: "con Qué tal!",
+                hero_desc: "Un nuevo feed vertical, economía de monedas y descubrimiento de contenido con IA te esperan. Regístrate ahora.",
+                form_title: "Crear Cuenta",
+                form_subtitle: "Únete al ecosistema Qué tal en segundos.",
+                label_username: "Nombre de usuario",
+                label_email: "Correo electrónico",
+                label_password: "Contraseña",
+                label_lang: "Idioma Principal",
+                btn_register: "CREAR CUENTA Y COMENZAR 🚀",
+                onboard_badge: "Paso 2 / 2 • Intereses",
+                onboard_title: "¿Qué te gusta ver?",
+                onboard_subtitle: "Selecciona al menos 3 categorías para tu feed.",
+                cat_music: "Música y Baile",
+                cat_tech: "Tecnología e IA",
+                cat_horror: "Terror y Misterio",
+                cat_life: "Estilo y Tendencias",
+                cat_art: "Arte y Diseño",
+                cat_comedy: "Comedia y Humor",
+                btn_enter: "ENTRAR AL FEED DE QUÉ TAL 🚀"
+            },
+            pt: {
+                brand: "Qué tal",
+                tagline: "Ecossistema Social Global",
+                launch_badge: "🚀 Lançamento Global Ativo",
+                hero_title_1: "Diga Olá",
+                hero_title_2: "com Qué tal!",
+                hero_desc: "Um novo feed vertical, economia de moedas e descoberta de conteúdo com IA esperam por você. Registre-se agora.",
+                form_title: "Criar Conta",
+                form_subtitle: "Entre no ecossistema Qué tal em segundos.",
+                label_username: "Nome de usuário",
+                label_email: "E-mail",
+                label_password: "Senha",
+                label_lang: "Idioma Principal",
+                btn_register: "CRIAR CONTA & COMEÇAR 🚀",
+                onboard_badge: "Passo 2 / 2 • Interesses",
+                onboard_title: "O que você gosta de assistir?",
+                onboard_subtitle: "Selecione pelo menos 3 categorias.",
+                cat_music: "Música e Dança",
+                cat_tech: "Tecnologia e IA",
+                cat_horror: "Terror e Mistério",
+                cat_life: "Estilo e Tendências",
+                cat_art: "Arte e Design",
+                cat_comedy: "Comédia e Humor",
+                btn_enter: "ENTRAR NO FEED DO QUÉ TAL 🚀"
+            },
+            fr: {
+                brand: "Qué tal",
+                tagline: "Écosystème Social Mondial",
+                launch_badge: "🚀 Lancement Mondial Actif",
+                hero_title_1: "Dis Bonjour",
+                hero_title_2: "avec Qué tal !",
+                hero_desc: "Un nouveau flux vertical, une économie de pièces et une découverte de contenu par IA vous attendent.",
+                form_title: "Créer un Compte",
+                form_subtitle: "Rejoignez l'écosystème Qué tal en quelques secondes.",
+                label_username: "Nom d'utilisateur",
+                label_email: "Adresse e-mail",
+                label_password: "Mot de passe",
+                label_lang: "Langue Principale",
+                btn_register: "CRÉER UN COMPTE & COMMENCER 🚀",
+                onboard_badge: "Étape 2 / 2 • Centres d'intérêt",
+                onboard_title: "Qu'aimer vous regarder ?",
+                onboard_subtitle: "Sélectionnez au moins 3 catégories.",
+                cat_music: "Musique & Danse",
+                cat_tech: "Tech & IA",
+                cat_horror: "Horreur & Mystère",
+                cat_life: "Mode de vie & Tendances",
+                cat_art: "Art & Design",
+                cat_comedy: "Comédie & Humour",
+                btn_enter: "ENTRER DANS LE FLUX QUÉ TAL 🚀"
+            },
+            zh: {
+                brand: "Qué tal",
+                tagline: "全球社交生态系统",
+                launch_badge: "🚀 全球发布上线",
+                hero_title_1: "与 Qué tal",
+                hero_title_2: "一起打个招呼！",
+                hero_desc: "全新的垂直动态、即时金币经济以及人工智能驱动的内容发现正在等待着您。立即注册！",
+                form_title: "创建账户",
+                form_subtitle: "几秒钟内加入 Qué tal 生态系统。",
+                label_username: "用户名",
+                label_email: "电子邮箱",
+                label_password: "密码",
+                label_lang: "首选语言",
+                btn_register: "创建账户并开始 🚀",
+                onboard_badge: "第 2 步 / 第 2 步 • 兴趣爱好",
+                onboard_title: "你喜欢看什么内容？",
+                onboard_subtitle: "请至少选择 3 个类别来定制您的动态。",
+                cat_music: "音乐与舞蹈",
+                cat_tech: "科技与人工智能",
+                cat_horror: "惊悚与悬疑",
+                cat_life: "生活方式与潮流",
+                cat_art: "艺术与设计",
+                cat_comedy: "喜剧与幽默",
+                btn_enter: "进入 Qué tal 动态 🚀"
+            },
+            ja: {
+                brand: "Qué tal",
+                tagline: "グローバルソーシャルエコシステム",
+                launch_badge: "🚀 グローバルローンチ中",
+                hero_title_1: "Qué tal で",
+                hero_title_2: "新しい世界へ！",
+                hero_desc: "新しいバーティカルフィード、コインエコノミー、AIによるコンテンツ発見があなたを待っています。今すぐ登録！",
+                form_title: "アカウント作成",
+                form_subtitle: "数秒で Qué tal エコシステムに参加できます。",
+                label_username: "ユーザー名",
+                label_email: "メールアドレス",
+                label_password: "パスワード",
+                label_lang: "主言語",
+                btn_register: "アカウント作成 & スタート 🚀",
+                onboard_badge: "ステップ 2 / 2 • 興味のある分野",
+                onboard_title: "何を見るのが好きですか？",
+                onboard_subtitle: "フィードをパーソナライズするために3つ以上選択してください。",
+                cat_music: "音楽 & ダンス",
+                cat_tech: "テクノロジー & AI",
+                cat_horror: "ホラー & ミステリー",
+                cat_life: "ライフスタイル & トレンド",
+                cat_art: "アート & デザイン",
+                cat_comedy: "コメディ & ユーモア",
+                btn_enter: "Qué tal フィードへ入る 🚀"
+            }
+        };
+
+        // Public project URL is safe in frontend code. Replace ONLY the publishable/anon key.
+        // Never paste a service_role or secret key into a website.
+        const SUPABASE_URL = 'https://qdywqohcgirlavjyuurw.supabase.co';
+        const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_YCDBcXAonND87fGunNZPPw_IzqsV2B_';
+        const configured = !SUPABASE_PUBLISHABLE_KEY.startsWith('PASTE_');
+        const sb = configured && window.supabase
+            ? window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+                auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: true }
+              })
+            : null;
+        let authMode = 'signup';
+        let selectedInterests = [];
+        let activeUser = null;
+        const $ = (id) => document.getElementById(id);
+        const originUrl = () => window.location.origin + window.location.pathname;
+        function msg(text, isError = false) {
+            const el = $('auth-message');
+            el.textContent = text;
+            el.classList.remove('hidden');
+            el.classList.toggle('text-rose-300', isError);
+            el.classList.toggle('text-cyan-300', !isError);
+        }
+        function changeLanguage(lang) {
+            const t = translations[lang] || translations['en'];
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (t[key]) el.innerText = t[key];
+            });
+            $('global-lang-select').value = lang;
+            $('reg-lang').value = lang;
+            document.documentElement.lang = translations[lang] ? lang : 'en';
+            if (!translations[lang]) msg('This language is listed but its translations are not yet complete; showing English.');
+            if (authMode !== 'signup') refreshAuthLabels();
+        }
+        function refreshAuthLabels() {
+            if (authMode === 'signup') return;
+            $('auth-title').textContent = authMode === 'login' ? 'Log in' : authMode === 'reset' ? 'Reset password' : 'Choose a new password';
+            $('auth-submit').textContent = authMode === 'login' ? 'LOG IN' : authMode === 'reset' ? 'SEND RESET EMAIL' : 'UPDATE PASSWORD';
+        }
+        function setAuthMode(mode) {
+            authMode = mode;
+            $('auth-message').classList.add('hidden');
+            const signup = mode === 'signup';
+            const reset = mode === 'reset';
+            const recovery = mode === 'recovery';
+            $('reg-username').closest('div.relative').parentElement.classList.toggle('hidden', !signup);
+            $('reg-lang').parentElement.classList.toggle('hidden', !signup);
+            $('reg-password').parentElement.classList.toggle('hidden', reset);
+            $('reg-username').required = signup;
+            $('reg-password').required = !reset;
+            $('qt-password-rules').classList.toggle('hidden', !signup && !recovery);
+            updateQtPasswordRules();
+            $('reg-email').parentElement.parentElement.classList.toggle('hidden', recovery);
+            $('reg-email').required = !recovery;
+            $('login-toggle').classList.toggle('hidden', mode === 'login' || recovery);
+            $('signup-toggle').classList.toggle('hidden', signup || recovery);
+            $('reset-toggle').classList.toggle('hidden', reset || recovery);
+            if (signup) {
+                $('auth-title').textContent = (translations[$('global-lang-select').value] || translations.en).form_title;
+                $('auth-submit').textContent = (translations[$('global-lang-select').value] || translations.en).btn_register;
+            } else refreshAuthLabels();
+        }
+        function qtPasswordChecks(password) {
+            return {length: password.length >= 12, lower: /[a-z]/.test(password),
+                upper: /[A-Z]/.test(password), number: /[0-9]/.test(password),
+                symbol: /[^A-Za-z0-9\s]/.test(password)};
+        }
+        function updateQtPasswordRules() {
+            const checks = qtPasswordChecks($('reg-password').value);
+            document.querySelectorAll('#qt-password-rules [data-rule]').forEach(row => {
+                const passed = checks[row.dataset.rule];
+                row.textContent = (passed ? '✓ ' : '○ ') + row.textContent.replace(/^[✓○]\s*/, '');
+                row.classList.toggle('text-green-400', passed);
+                row.classList.toggle('text-zinc-400', !passed);
+            });
+            return Object.values(checks).every(Boolean);
+        }
+        $('reg-password').addEventListener('input', updateQtPasswordRules);
+        async function handleRegistration(e) {
+            e.preventDefault();
+            if (!sb) { msg('Setup needed: add the Supabase publishable (or anon) key to this HTML file before deploying.', true); return; }
+            const button = $('auth-submit');
+            button.disabled = true;
+            const oldText = button.textContent;
+            button.textContent = 'Please wait…';
+            try {
+                const email = $('reg-email').value.trim();
+                const password = $('reg-password').value;
+                if ((authMode === 'signup' || authMode === 'recovery') && !updateQtPasswordRules()) throw new Error('Please meet all five password requirements.');
+                if (authMode === 'signup') {
+                    const username = $('reg-username').value.trim();
+                    if (!username) throw new Error('Please enter a username.');
+                    const {data, error} = await sb.auth.signUp({
+                        email, password,
+                        options: { emailRedirectTo: originUrl(), data: { username, preferred_language: $('reg-lang').value } }
+                    });
+                    if (error) throw error;
+                    if (data.session) await onSignedIn(data.user);
+                    else msg('Check your email for the confirmation link. Open it, then return here to log in.');
+                } else if (authMode === 'login') {
+                    const {data, error} = await sb.auth.signInWithPassword({ email, password });
+                    if (error) throw error;
+                    await onSignedIn(data.user);
+                } else if (authMode === 'reset') {
+                    const {error} = await sb.auth.resetPasswordForEmail(email, {redirectTo: originUrl()});
+                    if (error) throw error;
+                    msg('If this email has an account, a password reset link will arrive shortly.');
+                } else if (authMode === 'recovery') {
+                    const {error} = await sb.auth.updateUser({password});
+                    if (error) throw error;
+                    setAuthMode('login');
+                    msg('Password updated. You can log in now.');
+                }
+            } catch (error) { msg(error.message || 'Something went wrong. Please try again.', true); }
+            finally { button.disabled = false; if (button.textContent === 'Please wait…') button.textContent = oldText; }
+        }
+        async function onSignedIn(user) {
+            if (!user) return;
+            activeUser = user;
+            $('signed-in-bar').classList.remove('hidden');
+            $('signed-in-label').textContent = 'Signed in: ' + (user.email || 'Qué tal member');
+            $('view-registration').classList.add('hidden');
+            const saved = localStorage.getItem('quetal_interests_' + user.id);
+            let interests = [];
+            try { interests = saved ? JSON.parse(saved) : []; } catch (_) { /* Invalid old preferences */ }
+            if (Array.isArray(interests) && interests.length >= 3) {
+                selectedInterests = interests;
+                showFeed();
+            } else {
+                $('view-feed').classList.add('hidden');
+                $('view-onboarding').classList.remove('hidden');
+                $('onboard-message').textContent = 'Welcome! Choose at least 3 interests to continue.';
+            }
+        }
+        async function signOut() {
+            if (sb) await sb.auth.signOut();
+            activeUser = null;
+            qtClosePanel();
+            document.body.classList.remove('qt-feed-active');
+            document.getElementById('quetal-install-guide').style.display = '';
+            selectedInterests = [];
+            $('view-onboarding').classList.add('hidden');
+            $('view-feed').classList.add('hidden');
+            $('upload-panel').classList.add('hidden');
+            $('view-registration').classList.remove('hidden');
+            $('signed-in-bar').classList.add('hidden');
+            setAuthMode('login');
+            msg('You are logged out.');
+        }
+        async function initAuth() {
+            changeLanguage('en');
+            if (!sb) { msg('Registration setup is not finished: the Supabase publishable key is still needed.', true); return; }
+            const {data: {session}, error} = await sb.auth.getSession();
+            if (error) msg(error.message, true);
+            // Password recovery event arrives after clicking a Supabase recovery link.
+            sb.auth.onAuthStateChange((event, sessionNow) => {
+                if (event === 'PASSWORD_RECOVERY') {
+                    $('view-onboarding').classList.add('hidden');
+                    $('view-feed').classList.add('hidden');
+                    $('view-registration').classList.remove('hidden');
+                    setAuthMode('recovery');
+                    msg('Enter your new password, then tap Update Password.');
+                } else if (event === 'SIGNED_OUT') {
+                    activeUser = null;
+                }
+            });
+            if (session?.user && !window.location.hash.includes('type=recovery')) await onSignedIn(session.user);
+            else setAuthMode('signup');
+        }
+        document.addEventListener('DOMContentLoaded', initAuth);
+
+        function toggleInterest(element, category) {
+            element.classList.toggle('border-neoncian');
+            element.classList.toggle('neon-glow-cyan');
+            element.classList.toggle('bg-zinc-800');
+            
+            if(selectedInterests.includes(category)) {
+                selectedInterests = selectedInterests.filter(i => i !== category);
+            } else {
+                selectedInterests.push(category);
+            }
+        }
+
+        function finishOnboarding() {
+            if (!activeUser) { $('onboard-message').textContent = 'Please log in first.'; return; }
+            if (selectedInterests.length < 3) { $('onboard-message').textContent = 'Please choose at least 3 interests.'; return; }
+            localStorage.setItem('quetal_interests_' + activeUser.id, JSON.stringify(selectedInterests));
+            showFeed();
+            showToast('🎉 Welcome to Qué tal!');
+        }
+
+        function showFeed() {
+            if (!activeUser) return;
+            $('view-registration').classList.add('hidden');
+            $('view-onboarding').classList.add('hidden');
+            $('view-feed').classList.remove('hidden');
+            document.body.classList.add('qt-feed-active');
+            document.getElementById('quetal-install-banner').style.display = 'none';
+            document.getElementById('quetal-install-guide').style.display = 'none';
+            $('feed-welcome').textContent = 'Signed in as ' + (activeUser.user_metadata?.username || activeUser.email || 'Qué tal member');
+            $('feed-interests').textContent = 'Your interests: ' + selectedInterests.join(' • ');
+            loadVideos();
+            window.scrollTo(0, 0);
+        }
+
+        // Video publishing requires the SQL setup in quetal-video-setup.sql.
+        let videoPreviewUrl = null;
+        function toggleUploadPanel() {
+            if (!activeUser) return;
+            $('upload-panel').classList.toggle('hidden');
+        }
+        function previewSelectedVideo() {
+            if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
+            videoPreviewUrl = null;
+            const file = $('video-file').files?.[0];
+            const player = $('video-preview');
+            if (!file) { player.pause(); player.removeAttribute('src'); player.classList.add('hidden'); return; }
+            videoPreviewUrl = URL.createObjectURL(file);
+            player.src = videoPreviewUrl;
+            player.classList.remove('hidden');
+        }
+        function videoMessage(message, error=false) {
+            const el = $('video-upload-message');
+            el.textContent = message;
+            el.classList.toggle('text-rose-300', error);
+            el.classList.toggle('text-cyan-300', !error);
+        }
+        async function makeVideoThumbnail(file) {
+            return new Promise(resolve => {
+                const v = document.createElement('video');
+                const url = URL.createObjectURL(file);
+                let done = false;
+                const finish = blob => { if (done) return; done=true; clearTimeout(timeout); v.pause(); v.removeAttribute('src'); v.load(); URL.revokeObjectURL(url); resolve(blob); };
+                const timeout = setTimeout(()=>finish(null), 9000);
+                v.muted=true; v.playsInline=true; v.preload='auto';
+                v.addEventListener('error',()=>finish(null),{once:true});
+                v.addEventListener('loadedmetadata',()=>{ try { v.currentTime=Math.min(1,Math.max(0,v.duration/3)); } catch { finish(null); } },{once:true});
+                v.addEventListener('seeked',()=>{
+                    try {
+                        const canvas=document.createElement('canvas');
+                        const scale=Math.min(1,1200/Math.max(v.videoWidth,v.videoHeight));
+                        canvas.width=Math.max(1,Math.round(v.videoWidth*scale)); canvas.height=Math.max(1,Math.round(v.videoHeight*scale));
+                        canvas.getContext('2d').drawImage(v,0,0,canvas.width,canvas.height);
+                        canvas.toBlob(finish,'image/jpeg',.82);
+                    } catch { finish(null); }
+                },{once:true});
+                v.src=url;
+            });
+        }
+        async function uploadVideo(event) {
+            event.preventDefault();
+            if (!sb || !activeUser) { videoMessage('Please log in first.', true); return; }
+            const file = $('video-file').files?.[0];
+            if (!file) { videoMessage('Choose a video first.', true); return; }
+            const allowed = ['video/mp4', 'video/webm', 'video/quicktime'];
+            if (!allowed.includes(file.type)) { videoMessage('Please choose an MP4, WebM or MOV video.', true); return; }
+            if (file.size > 50 * 1024 * 1024) { videoMessage('Video is too large. Maximum is 50 MB.', true); return; }
+            const caption = $('video-caption').value.trim();
+            if (!caption) { videoMessage('Write a caption first.', true); return; }
+            const button = $('publish-video-button');
+            button.disabled = true;
+            button.textContent = 'Uploading… please wait';
+            let uploadedPath = null;
+            try {
+                const ext = {'video/mp4':'mp4','video/webm':'webm','video/quicktime':'mov'}[file.type];
+                const path = `${activeUser.id}/${crypto.randomUUID()}.${ext}`;
+                const {error: uploadError} = await sb.storage.from('videos').upload(path, file, {contentType:file.type, upsert:false});
+                if (uploadError) throw uploadError;
+                uploadedPath = path;
+                // Best-effort public thumbnail, used by WhatsApp/Open Graph previews.
+                try {
+                    const thumb = await makeVideoThumbnail(file);
+                    if (thumb) {
+                        const jpgPath = path.replace(/\.[^.]+$/, '.jpg');
+                        await sb.storage.from('videos').upload(jpgPath, thumb, {contentType:'image/jpeg',upsert:false});
+                    }
+                } catch (thumbnailError) { console.warn('Thumbnail not available', thumbnailError); }
+                const {error: postError} = await sb.from('video_posts').insert({user_id:activeUser.id, storage_path:path, caption, category:$('video-category').value});
+                if (postError) throw postError;
+                videoMessage('Your video is published! 🎉');
+                $('video-upload-form').reset();
+                previewSelectedVideo();
+                await loadVideos();
+            } catch (error) {
+                // Remove uploaded file when the database insert fails; best-effort cleanup.
+                if (uploadedPath) await sb.storage.from('videos').remove([uploadedPath]);
+                videoMessage('Could not publish: ' + (error.message || 'Please try again.'), true);
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Publish Video';
+            }
+        }
+        // Real video posts. Social actions require quetal-social-upgrade.sql in Supabase.
+        let videoObserver = null;
+        const countedVideosThisSession = new Set();
+        const videoViewTimers = new Map();
+        const formatViewCount = n => Number(n).toLocaleString(undefined, {notation: n >= 1000 ? 'compact' : 'standard', maximumFractionDigits: 1});
+        async function refreshVideoViews(postId, label) {
+            const {data, error} = await sb.rpc('get_quetal_video_views', {p_post_id: postId});
+            if (!error && label.isConnected) label.textContent = formatViewCount(Number(data) || 0) + ' views';
+            else if (error) console.warn('Video view counter not configured:', error.message);
+        }
+        async function recordVideoView(postId, label) {
+            if (countedVideosThisSession.has(postId)) return;
+            countedVideosThisSession.add(postId);
+            const {data, error} = await sb.rpc('record_quetal_video_view', {p_post_id: postId});
+            if (!error && label.isConnected) label.textContent = formatViewCount(Number(data) || 0) + ' views';
+            else if (error) { countedVideosThisSession.delete(postId); console.warn('View could not be saved:', error.message); }
+        }
+        const socialReadyError = 'Social features need the one-time Supabase setup. Ask the Qué tal administrator to install the social SQL file.';
+        function el(tag, cls, content) {
+            const node = document.createElement(tag);
+            if (cls) node.className = cls;
+            if (content !== undefined) node.textContent = content;
+            return node;
+        }
+        function actionButton(icon, label, onClick) {
+            const btn = el('button', 'qt-action');
+            btn.type = 'button';
+            const ico = el('i', `fa-solid ${icon}`);
+            const txt = el('span', '', label);
+            btn.append(ico, txt);
+            btn.addEventListener('click', onClick);
+            btn.addEventListener('touchstart', event => event.stopPropagation(), {passive:true});
+            return {btn, txt};
+        }
+        function qtTagQuery() {
+            return ($('qt-tag-input').value.trim().replace(/^#+/, '').match(/^[\p{L}\p{N}_]+/u)?.[0] || '').toLocaleLowerCase();
+        }
+        let qtSearchTimer = null;
+        let qtVideoLoadGeneration = 0;
+        $('qt-tag-input').addEventListener('input', () => {
+            clearTimeout(qtSearchTimer);
+            qtSearchTimer = setTimeout(() => loadVideos(), 450);
+        });
+        $('qt-tag-clear').addEventListener('click', () => {
+            clearTimeout(qtSearchTimer);
+            $('qt-tag-input').value = '';
+            loadVideos();
+        });
+        async function loadVideos() {
+            if (!sb || !activeUser) return;
+            const generation = ++qtVideoLoadGeneration;
+            const feed = $('community-videos');
+            const message = $('video-feed-message');
+            const tag = qtTagQuery();
+            message.textContent = tag ? `Searching all videos for #${tag}…` : 'Loading videos…';
+            let data = [], error = null;
+            if (!tag) {
+                const result = await sb.from('video_posts').select('id,user_id,storage_path,caption,category,created_at').order('created_at',{ascending:false}).limit(50);
+                data = result.data || []; error = result.error;
+            } else {
+                // Search server-side, page through the entire matching caption index,
+                // then verify exact hashtag boundaries (e.g. #art != #artist).
+                // Render at most 50 results to avoid loading excessive video media.
+                let offset = 0;
+                const batchSize = 200;
+                while (data.length < 50) {
+                    const result = await sb.from('video_posts')
+                        .select('id,user_id,storage_path,caption,category,created_at')
+                        .ilike('caption', '%#' + tag.replace(/[%,_\\]/g, '') + '%')
+                        .order('created_at',{ascending:false}).range(offset,offset+batchSize-1);
+                    if (result.error) { error = result.error; break; }
+                    const batch = result.data || [];
+                    data.push(...batch.filter(post => [...(post.caption || '').matchAll(/#([\p{L}\p{N}_]+)/gu)]
+                        .some(m => m[1].toLocaleLowerCase() === tag)).slice(0,50-data.length));
+                    if (batch.length < batchSize) break;
+                    offset += batchSize;
+                    if (generation !== qtVideoLoadGeneration) return;
+                }
+            }
+            if (generation !== qtVideoLoadGeneration) return;
+            if (videoObserver) { videoObserver.disconnect(); videoObserver = null; }
+            for (const timer of videoViewTimers.values()) clearTimeout(timer);
+            videoViewTimers.clear();
+            feed.replaceChildren();
+            if (error) { message.textContent = 'Could not load videos: ' + error.message; return; }
+            if (!data?.length) { message.textContent = tag ? `No videos tagged #${tag} found.` : 'No videos yet. Be the first to upload!'; return; }
+            message.textContent = tag ? `${data.length} video(s) tagged #${tag} • Swipe for more` : `${data.length} videos • Swipe up to see the next one`;
+            for (const post of data) {
+                const article = el('article', 'qt-video-card');
+                article.dataset.postId = post.id;
+                article.dataset.caption = post.caption || '';
+                const player = el('video');
+                player.playsInline = true;
+                player.preload = 'none';
+                player.loop = true;
+                player.muted = true; // Mobile browsers allow muted autoplay; viewers can turn sound on.
+                player.controls = false;
+                player.style.visibility = 'hidden';
+                player.setAttribute('aria-label', 'Video: ' + post.caption);
+                const {data: urlData} = sb.storage.from('videos').getPublicUrl(post.storage_path);
+                // No network video request until the viewer explicitly presses Play.
+                player.dataset.videoUrl = urlData.publicUrl;
+                // Uploads already attempt to save a separate JPEG thumbnail. Display that
+                // small image instead of downloading the video before a tap.
+                const poster = el('img', 'qt-video-poster');
+                poster.alt = 'Preview for ' + (post.caption || 'video');
+                poster.loading = 'lazy';
+                poster.decoding = 'async';
+                poster.referrerPolicy = 'no-referrer';
+                const jpgPath = post.storage_path.replace(/\.[^.]+$/, '.jpg');
+                const {data: posterUrlData} = sb.storage.from('videos').getPublicUrl(jpgPath);
+                poster.src = posterUrlData.publicUrl;
+                // Older posts may not have a JPEG. Preview a paused frame from the video
+                // when its card is visible. Never autoplay or load off-screen videos.
+                const frame = el('video', 'qt-preview-frame');
+                frame.muted = true;
+                frame.playsInline = true;
+                frame.preload = 'metadata';
+                frame.setAttribute('aria-hidden', 'true');
+                frame.style.display = 'none';
+                let needsFrame = false;
+                let frameReady = false;
+                const requestFrame = () => {
+                    if (!needsFrame || frameReady || frame.hasAttribute('src')) return;
+                    frame.style.display = 'block';
+                    frame.src = player.dataset.videoUrl;
+                    frame.load();
+                };
+                const releaseFrame = () => {
+                    if (frame.hasAttribute('src')) {
+                        frame.pause(); frame.removeAttribute('src'); frame.load();
+                    }
+                    if (!frameReady) frame.style.display = 'none';
+                };
+                frame.addEventListener('loadedmetadata', () => {
+                    try { frame.currentTime = Math.min(0.35, Math.max(0.05, (frame.duration || 1) / 10)); }
+                    catch (_) { /* Some browsers display the initial frame without seeking. */ }
+                });
+                frame.addEventListener('seeked', () => { frame.pause(); frameReady = true; });
+                frame.addEventListener('error', () => { releaseFrame(); frame.style.display='none'; });
+                poster.addEventListener('error', () => {
+                    poster.remove();
+                    needsFrame = true;
+                    if (article.dataset.qtVisible === 'true') requestFrame();
+                }, {once:true});
+                article.addEventListener('qt-preview-visible', () => {
+                    article.dataset.qtVisible = 'true';
+                    requestFrame();
+                });
+                article.addEventListener('qt-preview-hidden', () => {
+                    article.dataset.qtVisible = 'false';
+                    if (!frameReady) releaseFrame();
+                });
+                const playButton = el('button', 'qt-tap-play', '▶');
+                playButton.type = 'button';
+                playButton.setAttribute('aria-label', 'Play video');
+                const stopVideo = () => {
+                    player.pause();
+                    player.style.visibility = 'hidden';
+                    playButton.classList.remove('qt-playing');
+                    playButton.textContent = '▶';
+                    playButton.setAttribute('aria-label', 'Play video');
+                    // Release the media connection when the video is no longer selected.
+                    if (player.hasAttribute('src')) {
+                        player.removeAttribute('src');
+                        player.load();
+                    }
+                };
+                const toggleVideo = async () => {
+                    if (!player.paused) { stopVideo(); return; }
+                    document.querySelectorAll('#community-videos video:not(.qt-preview-frame)').forEach(v => {
+                        if (v !== player) v.dispatchEvent(new Event('qt-stop-video'));
+                    });
+                    if (!player.hasAttribute('src')) player.src = player.dataset.videoUrl;
+                    try {
+                        await player.play();
+                        player.style.visibility = 'visible';
+                        if (!countedVideosThisSession.has(post.id)) {
+                            const timer = setTimeout(() => {
+                                videoViewTimers.delete(post.id);
+                                if (!document.hidden && !player.paused && player.currentTime >= 2.5) {
+                                    recordVideoView(post.id, viewLabel);
+                                }
+                            }, 3000);
+                            videoViewTimers.set(post.id, timer);
+                        }
+                        playButton.classList.add('qt-playing');
+                        playButton.textContent = 'Ⅱ';
+                        playButton.setAttribute('aria-label', 'Pause video');
+                    } catch (_) { stopVideo(); }
+                };
+                player.addEventListener('qt-stop-video', stopVideo);
+                playButton.addEventListener('click', toggleVideo);
+                player.addEventListener('click', toggleVideo);
+                player.addEventListener('ended', stopVideo);
+                const shade = el('div','qt-video-shade');
+                const info = el('div','qt-video-info');
+                const creator = el('p','font-bold text-sm mb-1', post.user_id === activeUser.id ? '@You' : '@Creator ' + String(post.user_id).slice(0,6));
+                const caption = el('p','text-sm break-words',post.caption);
+                const category = el('p','text-xs text-zinc-300 mt-1',post.category);
+                const viewLine = el('div','qt-video-views');
+                const eye = el('i','fa-regular fa-eye');
+                eye.setAttribute('aria-hidden','true');
+                const viewLabel = el('span','','— views');
+                viewLine.append(eye, viewLabel);
+                creator.classList.add('qt-creator-link');
+                creator.setAttribute('role','button'); creator.tabIndex=0;
+                creator.addEventListener('click',()=>qtOpenPanel('user',post.user_id));
+                creator.addEventListener('keydown',e=>{if(e.key==='Enter')qtOpenPanel('user',post.user_id);});
+                info.append(creator,caption,category,viewLine);
+                const hashtags = [...new Set([...(post.caption || '').matchAll(/#([\p{L}\p{N}_]+)/gu)].map(m => m[1]))].slice(0,15);
+                if (hashtags.length) {
+                    const tagsRow = el('div','flex flex-wrap gap-2 mt-1');
+                    hashtags.forEach(tag => {
+                        const button = el('button','text-cyan-300 text-xs underline','#' + tag);
+                        button.type = 'button';
+                        button.addEventListener('click', () => { $('qt-tag-input').value = '#' + tag; loadVideos(); });
+                        tagsRow.append(button);
+                    });
+                    info.append(tagsRow);
+                }
+                refreshVideoViews(post.id,viewLabel);
+                const actions = el('div','qt-video-actions');
+                const sound = actionButton('fa-volume-xmark','Sound off', () => {
+                    player.muted = !player.muted;
+                    sound.btn.querySelector('i').className = player.muted ? 'fa-solid fa-volume-xmark' : 'fa-solid fa-volume-high';
+                    sound.txt.textContent = player.muted ? 'Sound off' : 'Sound on';
+                });
+                // Tap for blue thumbs-up; hold for six reactions.
+                const reactionTypes = {
+                    like: {emoji:'👍',icon:'fa-regular fa-thumbs-up',label:'Liked'},
+                    love: {emoji:'❤️',icon:'fa-solid fa-heart',label:'Love'},
+                    haha: {emoji:'😂',icon:'fa-solid fa-face-laugh',label:'Haha'},
+                    wow: {emoji:'😮',icon:'fa-solid fa-face-surprise',label:'Wow'},
+                    sad: {emoji:'😢',icon:'fa-solid fa-face-sad-tear',label:'Sad'},
+                    angry: {emoji:'😡',icon:'fa-solid fa-face-angry',label:'Angry'}
+                };
+                let currentReaction = null;
+                let reactionBusy = false;
+                let holdTimer = null;
+                let didHold = false;
+                let picker = null;
+                sound.btn.classList.add('qt-sound');
+                const like = actionButton('fa-regular fa-thumbs-up','Like', () => {
+                    if (didHold) { didHold = false; return; }
+                    setReaction(currentReaction === 'like' ? null : 'like');
+                });
+                like.btn.setAttribute('aria-label','Like video; press and hold for reactions');
+                function paintReaction(value) {
+                    currentReaction = value;
+                    const kind = value ? reactionTypes[value] : null;
+                    like.btn.querySelector('i').className = kind ? kind.icon : 'fa-regular fa-thumbs-up';
+                    like.txt.textContent = kind ? kind.label : 'Like';
+                    like.btn.setAttribute('aria-pressed', String(!!value));
+                    like.btn.classList.toggle('qt-love', value === 'love');
+                    like.btn.classList.toggle('qt-other', !!value && value !== 'love' && value !== 'like');
+                }
+                async function setReaction(value) {
+                    if (reactionBusy) return;
+                    reactionBusy = true;
+                    const previous = currentReaction;
+                    paintReaction(value);
+                    if (picker) { picker.remove(); picker = null; }
+                    let result;
+                    try {
+                        if (!value) result = await sb.from('video_reactions').delete().eq('post_id',post.id).eq('user_id',activeUser.id);
+                        else result = await sb.from('video_reactions').upsert({post_id:post.id,user_id:activeUser.id,reaction:value},{onConflict:'post_id,user_id'});
+                        if (result.error) throw result.error;
+                    } catch (error) {
+                        paintReaction(previous);
+                        alert('Could not save reaction: ' + (error.message || 'Please try again.'));
+                    } finally { reactionBusy = false; }
+                }
+                function showReactionPicker() {
+                    if (picker) return;
+                    picker = el('div','qt-reaction-picker');
+                    picker.setAttribute('role','group');
+                    picker.setAttribute('aria-label','Choose a reaction');
+                    Object.entries(reactionTypes).forEach(([value,kind]) => {
+                        const choice = el('button','',kind.emoji);
+                        choice.type = 'button';
+                        choice.setAttribute('aria-label',kind.label);
+                        choice.addEventListener('click',event => {event.stopPropagation(); setReaction(value);});
+                        picker.append(choice);
+                    });
+                    actions.append(picker);
+                }
+                like.btn.addEventListener('pointerdown',event => {
+                    if (event.pointerType === 'mouse' && event.button !== 0) return;
+                    didHold = false;
+                    clearTimeout(holdTimer);
+                    holdTimer = setTimeout(() => {didHold = true; showReactionPicker();}, 480);
+                });
+                ['pointerup','pointercancel','pointerleave'].forEach(type => like.btn.addEventListener(type,() => clearTimeout(holdTimer)));
+                like.btn.addEventListener('contextmenu',event => {event.preventDefault(); didHold = true; showReactionPicker();});
+                // Retrieve saved reaction when returning or signing back in.
+                sb.from('video_reactions').select('reaction').eq('post_id',post.id).eq('user_id',activeUser.id).maybeSingle()
+                    .then(({data,error}) => { if (!error && !reactionBusy) paintReaction(data?.reaction || null); });
+                const comment = actionButton('fa-comment','Comment', () => openComments(article,post));
+                const share = actionButton('fa-share','Share', async () => {
+                    const link = new URL('/share/' + encodeURIComponent(post.id), window.location.origin);
+                    try {
+                        if (navigator.share) await navigator.share({title:'Watch on Qué tal',text:post.caption,url:link.href});
+                        else if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(link.href); showToast('Video link copied!'); }
+                        else window.prompt('Copy this video link:',link.href);
+                    } catch (e) { if (e.name !== 'AbortError') window.prompt('Copy this video link:',link.href); }
+                });
+                const follow = actionButton('fa-user-plus',post.user_id === activeUser.id ? 'Your post' : 'Follow', async () => {
+                    if (post.user_id === activeUser.id) return;
+                    const {data: old,error: checkError} = await sb.from('creator_follows').select('follower_id').eq('follower_id',activeUser.id).eq('creator_id',post.user_id).maybeSingle();
+                    if (checkError) { alert(socialReadyError); return; }
+                    const result = old ? await sb.from('creator_follows').delete().eq('follower_id',activeUser.id).eq('creator_id',post.user_id) : await sb.from('creator_follows').insert({follower_id:activeUser.id,creator_id:post.user_id});
+                    if (result.error) { alert(result.error.message); return; }
+                    follow.btn.setAttribute('aria-pressed',String(!old));
+                    follow.txt.textContent = old ? 'Follow' : 'Following';
+                });
+                // Restore social state from Supabase whenever the feed is rebuilt.
+                if (post.user_id !== activeUser.id) {
+                    sb.from('creator_follows').select('follower_id').eq('follower_id',activeUser.id).eq('creator_id',post.user_id).maybeSingle()
+                        .then(({data,error}) => {
+                            if (!error && data) { follow.btn.setAttribute('aria-pressed','true'); follow.txt.textContent='Following'; }
+                        });
+                }
+                if (post.user_id === activeUser.id) follow.btn.disabled = true;
+                follow.btn.classList.add('qt-follow');
+                follow.btn.querySelector('i').remove();
+                actions.addEventListener('touchmove', event => event.stopPropagation(), {passive:true});
+                actions.append(sound.btn,like.btn,comment.btn,share.btn);
+                article.append(poster,frame,player,shade,playButton,info,actions,follow.btn);
+                feed.appendChild(article);
+            }
+            videoObserver = new IntersectionObserver(entries => {
+                for (const entry of entries) {
+                    const video = entry.target.querySelector('video:not(.qt-preview-frame)');
+                    if (!video) continue;
+                    const postId = entry.target.dataset.postId;
+                    if (videoViewTimers.has(postId)) { clearTimeout(videoViewTimers.get(postId)); videoViewTimers.delete(postId); }
+                    if (entry.isIntersecting && entry.intersectionRatio >= .65 && !document.hidden) {
+                        // Only fetch a paused preview frame for missing thumbnails. Never autoplay.
+                        entry.target.dispatchEvent(new Event('qt-preview-visible'));
+                    } else {
+                        entry.target.dispatchEvent(new Event('qt-preview-hidden'));
+                        video.dispatchEvent(new Event('qt-stop-video'));
+                    }
+                }
+            },{root:feed,threshold:[0,.65,1]});
+            feed.querySelectorAll('.qt-video-card').forEach(card=>videoObserver.observe(card));
+            const hashId = window.location.hash.match(/^#video-([a-f0-9-]+)$/i)?.[1];
+            if (hashId) feed.querySelectorAll('.qt-video-card').forEach(card => {if (card.dataset.postId === hashId) card.scrollIntoView({block:'nearest'});});
+        }
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                document.querySelectorAll('#community-videos video:not(.qt-preview-frame)').forEach(v=>v.dispatchEvent(new Event('qt-stop-video')));
+                for (const timer of videoViewTimers.values()) clearTimeout(timer);
+                videoViewTimers.clear();
+            }
+        });
+        async function openComments(article, post) {
+            const existingPanel = article.querySelector('.qt-comments');
+            if (existingPanel) { existingPanel.remove(); return; }
+            const panel = el('section','qt-comments');
+            const top = el('div','flex justify-between items-center mb-3');
+            top.append(el('h3','font-bold','Comments'),actionButton('fa-xmark','Close',()=>panel.remove()).btn);
+            const list = el('div','qt-comment-list space-y-3 text-sm mb-3','Loading comments…');
+            const form = el('form','flex gap-2');
+            const input = el('input','flex-1 min-w-0 bg-zinc-900 border border-zinc-600 rounded-xl p-3 text-white text-sm');
+            input.placeholder='Write a kind comment…'; input.maxLength=500; input.required=true;
+            const submit = el('button','bg-cyan-400 text-black rounded-xl px-3 font-bold','Post'); submit.type='submit';
+            form.append(input,submit);
+            panel.append(top,list,form);
+            article.appendChild(panel);
+            async function refresh() {
+                const {data,error} = await sb.from('video_comments').select('user_id,body,created_at').eq('post_id',post.id).order('created_at',{ascending:true}).limit(100);
+                list.replaceChildren();
+                if (error) { list.textContent='Could not load comments: ' + error.message; return; }
+                if (!data.length) {list.textContent='No comments yet. Be the first!';return;}
+                for (const c of data) {
+                    const item=el('p','break-words');
+                    const who=el('strong','text-cyan-300',c.user_id===activeUser.id?'You: ':'Member: ');
+                    item.append(who,document.createTextNode(c.body)); list.appendChild(item);
+                }
+            }
+            form.addEventListener('submit',async e=>{
+                e.preventDefault(); const body=input.value.trim(); if(!body)return;
+                submit.disabled=true;
+                const {error}=await sb.from('video_comments').insert({post_id:post.id,user_id:activeUser.id,body});
+                submit.disabled=false;
+                if(error){alert(error.message);return;}
+                input.value=''; await refresh();
+            });
+            await refresh();
+        }
+
+        // --- NEW: optional member tools. They do not alter signup/login/onboarding. ---
+        const qtSocialBody = () => document.getElementById('qt-social-body');
+        const qtSocialMsg = (s='') => { document.getElementById('qt-social-message').textContent = s; };
+        let qtCurrentPanel = null;
+        const qtThemeKey='qt-social-theme-v1';
+        const qtTheme=()=>{try{return localStorage.getItem(qtThemeKey)||'neon';}catch{return 'neon';}};
+        function qtApplyTheme(){
+          const panel=document.getElementById('qt-social-panel');
+          panel.classList.remove('qt-theme-neon','qt-theme-dark','qt-theme-light');
+          panel.classList.add('qt-theme-'+qtTheme());
+        }
+        function qtThemePicker(){
+          const wrap=el('label','qt-theme-picker','Background theme: ');
+          const select=el('select');select.setAttribute('aria-label','Chat and People background theme');
+          [['neon','Neon purple & black'],['dark','Dark'],['light','White']].forEach(([v,t])=>{const o=el('option','',t);o.value=v;select.append(o);});
+          select.value=qtTheme();select.onchange=()=>{try{localStorage.setItem(qtThemeKey,select.value);}catch{}qtApplyTheme();};
+          wrap.append(select);return wrap;
+        }
+        // Ephemeral Supabase Realtime presence and typing. Never claim a user is offline
+        // when presence cannot be established. No extra database table is required.
+        let qtLiveChannel=null,qtLiveOther=null,qtLiveTypingUntil=0;
+        let qtLiveTypingLabel=null,qtLivePresenceLabel=null,qtLiveTypingTimer=null,qtWasOnline=false;
+        function qtStopLive(){
+          if(qtLiveTypingTimer){clearTimeout(qtLiveTypingTimer);qtLiveTypingTimer=null;}
+          if(qtLiveChannel){try{sb.removeChannel(qtLiveChannel);}catch{}qtLiveChannel=null;}
+          qtLiveOther=null;qtLiveTypingLabel=null;qtLivePresenceLabel=null;qtWasOnline=false;
+        }
+        let qtStoredSeen=null, qtSeenBusy=false, qtSeenOwner=null, qtSeenWriteAt=0;
+        async function qtTouchSeen(){
+          if(!activeUser||document.hidden)return;
+          const uid=activeUser.id;if(qtSeenOwner===uid&&Date.now()-qtSeenWriteAt<55000)return;
+          qtSeenOwner=uid;qtSeenWriteAt=Date.now();
+          let {error}=await sb.rpc('qt_touch_last_seen');
+          // Fallback when the optional RPC has not been installed on Supabase.
+          if(error){const result=await sb.from('qt_last_seen').upsert({user_id:uid,last_seen_at:new Date().toISOString()},{onConflict:'user_id'});error=result.error;}
+          if(error){qtSeenWriteAt=0;console.warn('Last seen write:',error.message);}
+        }
+        async function qtFetchSeen(){
+          const other=qtLiveOther;if(!other||qtSeenBusy)return;qtSeenBusy=true;
+          try{const {data,error}=await sb.from('qt_last_seen').select('last_seen_at').eq('user_id',other).maybeSingle();if(other===qtLiveOther){qtStoredSeen=error?null:data?.last_seen_at;qtLiveUpdate();}if(error)console.warn('Last seen read:',error.message);}finally{qtSeenBusy=false;}
+        }
+        setInterval(()=>{qtTouchSeen().catch(()=>{});qtFetchSeen().catch(()=>{});},15000);
+        document.addEventListener('visibilitychange',()=>{if(!document.hidden){qtTouchSeen().catch(()=>{});qtFetchSeen().catch(()=>{});}});
+        function qtLiveUpdate(){
+          if(!qtLiveChannel||!qtLivePresenceLabel||!qtLiveOther)return;
+          const state=qtLiveChannel.presenceState();
+          const online=Object.values(state).flat().some(x=>x.user_id===qtLiveOther);
+          const key='qt-last-observed:'+activeUser.id+':'+qtLiveOther;let last=null;
+          try{if(qtWasOnline&&!online)localStorage.setItem(key,new Date().toISOString());last=localStorage.getItem(key);}catch{}
+          qtWasOnline=online;
+          last=qtStoredSeen||last;let label='Last seen unavailable';if(last){const d=new Date(last),now=new Date(),y=new Date();y.setDate(y.getDate()-1);const day=d.toDateString()===now.toDateString()?'today':d.toDateString()===y.toDateString()?'yesterday':d.toLocaleDateString();label='Last seen '+day+' at '+d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});}
+          qtLivePresenceLabel.textContent=online?'● Online now':label;
+          qtLivePresenceLabel.style.color=online?'#24dc89':'';
+        }
+        function qtStartLive(other,requestId,presenceLabel,typingLabel,refresh){
+          qtStopLive();
+          qtLiveOther=other;qtLivePresenceLabel=presenceLabel;qtLiveTypingLabel=typingLabel;qtStoredSeen=null;qtTouchSeen().catch(()=>{});qtFetchSeen().catch(()=>{});
+          if(!sb?.channel)return;
+          const ch=sb.channel('qt-chat-live-'+requestId,{config:{presence:{key:activeUser.id},broadcast:{self:false}}});
+          qtLiveChannel=ch;
+          ch.on('presence',{event:'sync'},qtLiveUpdate)
+            .on('broadcast',{event:'typing'},({payload})=>{
+              if(payload?.user_id!==other||qtCurrentPanel?.uid!==other)return;
+              typingLabel.textContent=payload.typing?'Typing…':'';
+              if(qtLiveTypingTimer)clearTimeout(qtLiveTypingTimer);
+              if(payload.typing)qtLiveTypingTimer=setTimeout(()=>{typingLabel.textContent='';},3000);
+            })
+            .on('broadcast',{event:'message'},({payload})=>{if(payload?.user_id===other)refresh().catch(()=>{});})
+            .subscribe(async status=>{
+              if(status==='SUBSCRIBED'){try{await ch.track({user_id:activeUser.id,online_at:new Date().toISOString()});}catch{}}
+              if(status==='CHANNEL_ERROR'||status==='TIMED_OUT')qtLiveUpdate();
+            });
+        }
+        function qtSendTyping(typing){
+          if(qtLiveChannel)qtLiveChannel.send({type:'broadcast',event:'typing',payload:{user_id:activeUser.id,typing}}).catch(()=>{});
+        }
+
+        function qtOpenPhotoViewer(profile,name){
+          const d=el('dialog','qt-photo-dialog');d.setAttribute('aria-label',name+' profile picture');
+          const bar=el('div','qt-viewer-bar');const title=el('strong','',name);const close=el('button','','×');close.type='button';close.setAttribute('aria-label','Close photo');close.onclick=()=>d.close();bar.append(title,close);
+          const content=el('div','qt-viewer-content');const url=qtProfileImage(profile);const picture=url?el('img'):qtAvatar(profile,name);
+          if(url){picture.src=url;picture.alt=name+' profile picture';picture.draggable=false;picture.onerror=()=>{content.replaceChildren(qtAvatar(profile,name));};}
+          content.append(picture);d.append(bar,content);d.addEventListener('click',e=>{if(e.target===d||e.target===content)d.close();});
+          d.addEventListener('contextmenu',e=>e.preventDefault());d.onclose=()=>d.remove();document.body.append(d);d.showModal();
+        }
+        const qtProfileImage = p => p?.avatar_path ? sb.storage.from('quetal-avatars').getPublicUrl(p.avatar_path).data.publicUrl : '';
+        const qtBtn = (text,fn,secondary=false) => {const b=el('button',secondary?'qt-social-secondary':'qt-social-btn',text);b.type='button';b.onclick=fn;return b;};
+        const qtField = (label,value='',max=100,multiline=false) => {
+          const wrap=el('label','block text-sm');wrap.append(el('span','block mb-2',label));
+          const field=el(multiline?'textarea':'input');field.value=value||'';field.maxLength=max;
+          if(multiline)field.rows=3;
+          wrap.append(field);return {wrap,field};
+        };
+        const qtRow = (...nodes) => {const d=el('div','flex flex-wrap gap-2 items-center');d.append(...nodes);return d;};
+        async function qtReadProfile(uid) {
+          const {data,error}=await sb.from('qt_profiles').select('user_id,display_name,bio,status,avatar_path').eq('user_id',uid).maybeSingle();
+          if(error) throw error;return data;
+        }
+        // Per-device read markers. These do not claim cross-device synchronization.
+        const qtReadKey = (rid) => 'qt-read-v1:' + (activeUser?.id||'') + ':' + rid;
+        const qtGetRead = (rid) => {try{return localStorage.getItem(qtReadKey(rid))||'';}catch{return '';}};
+        const qtSetRead = (rid,stamp) => {if(!stamp)return;try{localStorage.setItem(qtReadKey(rid),stamp);}catch{}};
+        const qtWhen = (date) => date ? new Date(date).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}) : '';
+        const qtAvatar = (p,label='Member') => {
+          const wrap=el('span','qt-social-avatar qt-letter-avatar');wrap.style.width='46px';wrap.style.height='46px';
+          const letter=Array.from(String(label||'M').trim())[0]||'M';wrap.textContent=letter.toLocaleUpperCase();
+          wrap.setAttribute('role','img');wrap.setAttribute('aria-label',label+' profile picture');
+          const url=qtProfileImage(p);
+          if(url){const img=el('img','qt-social-avatar');img.alt='';img.style.width='100%';img.style.height='100%';img.style.borderRadius='50%';img.onload=()=>{wrap.textContent='';wrap.append(img);};img.onerror=()=>{};img.src=url;}
+          return wrap;
+        };
+        let qtNotificationsBaseline=null;
+        async function qtEnableNotifications(){
+          if(!('Notification' in window)){qtSocialMsg('This browser does not support notifications.');return;}
+          if(!window.isSecureContext){qtSocialMsg('Notifications require HTTPS.');return;}
+          const permission=await Notification.requestPermission();
+          if(permission==='granted'){
+            try{localStorage.setItem('qt-notify-opt-in','1');}catch{}
+            qtSocialMsg('Notifications enabled while Qué Tal is running. Closed-app push requires server setup.');
+          }else qtSocialMsg('Notification permission was not granted.');
+        }
+        function qtMaybeNotify(count,unread){
+          const current=count+unread;
+          if(qtNotificationsBaseline===null){qtNotificationsBaseline=current;return;}
+          const increased=current>qtNotificationsBaseline;qtNotificationsBaseline=current;
+          if(!increased||document.visibilityState==='visible'||Notification.permission!=='granted')return;
+          try{if(localStorage.getItem('qt-notify-opt-in')!=='1')return;}catch{return;}
+          try{const n=new Notification('Qué Tal Social',{body:'You have a new message or message request.',tag:'quetal-chat-update'});n.onclick=()=>{window.focus();qtOpenPanel('chats');n.close();};}catch(e){console.warn('Notification:',e);}
+        }
+        let qtBadgeBusy=false;
+        async function qtRefreshRequestBadge(){
+          if(qtBadgeBusy)return;qtBadgeBusy=true;
+          try{
+            const requestBadge=document.getElementById('qt-request-badge');
+            const unreadBadge=document.getElementById('qt-unread-badge');
+            if(!activeUser||!sb){requestBadge.classList.add('hidden');unreadBadge.classList.add('hidden');return;}
+            const {count,error}=await sb.from('qt_message_requests').select('id',{count:'exact',head:true}).eq('recipient_id',activeUser.id).eq('status','pending');
+            if(!error&&count){requestBadge.textContent=String(count);requestBadge.title=count+' pending message requests';requestBadge.classList.remove('hidden');}
+            else {requestBadge.classList.add('hidden');requestBadge.textContent='';}
+            const {data:convos,error:ce}=await sb.from('qt_message_requests').select('id').eq('status','accepted').or(`sender_id.eq.${activeUser.id},recipient_id.eq.${activeUser.id}`).limit(100);
+            if(ce)return;
+            let unreadConversations=0;
+            await Promise.all((convos||[]).map(async r=>{
+              const {data:messages,error:me}=await sb.from('qt_messages').select('sender_id,created_at').eq('request_id',r.id).order('created_at',{ascending:false}).limit(100);
+              if(me)return;
+              if((messages||[]).some(m=>m.sender_id!==activeUser.id && (!qtGetRead(r.id)||m.created_at>qtGetRead(r.id))))unreadConversations++;
+            }));
+            qtMaybeNotify(error?0:(count||0),unreadConversations);
+            if(unreadConversations){unreadBadge.textContent=String(unreadConversations);unreadBadge.title=unreadConversations+' unread conversations';unreadBadge.classList.remove('hidden');}
+            else {unreadBadge.classList.add('hidden');unreadBadge.textContent='';}
+          }finally{qtBadgeBusy=false;}
+        }
+        setInterval(()=>{if(activeUser){qtRefreshRequestBadge().catch(()=>{});if(qtCurrentPanel?.type==='chat'&&qtConversationRefresh)qtConversationRefresh().catch(()=>{});if(qtCurrentPanel?.type==='chats')qtShowChats().catch(()=>{});if(qtCurrentPanel?.type==='requests')qtShowRequests().catch(()=>{});}},8000);
+        document.addEventListener('visibilitychange',()=>{if(!document.hidden&&activeUser){qtRefreshRequestBadge().catch(()=>{});if(qtCurrentPanel?.type==='chat'&&qtConversationRefresh)qtConversationRefresh().catch(()=>{});}});
+        let qtConversationRefresh=null, qtChatCleanup=null;
+        function qtBack(){if(history.state?.qtPanel)history.back();else qtClosePanel();}
+        window.addEventListener('popstate',e=>{if(e.state?.qtPanel)qtOpenPanel(e.state.qtPanel.type,e.state.qtPanel.uid,true);else qtClosePanel();});
+        async function qtOpenPanel(type='me',uid=null,fromHistory=false) {
+          if(!activeUser) return;
+          if(qtChatCleanup){qtChatCleanup();qtChatCleanup=null;}
+          if(!fromHistory && (qtCurrentPanel?.type!==type||qtCurrentPanel?.uid!==uid))history.pushState({qtPanel:{type,uid}},'');
+          document.getElementById('qt-social-panel').classList.toggle('qt-conversation',type==='chat');
+          qtCurrentPanel={type,uid};
+          qtConversationRefresh=null;
+          qtStopLive();qtApplyTheme();
+          qtRefreshRequestBadge().catch(()=>{});
+          document.getElementById('qt-social-panel').classList.remove('hidden');
+          document.querySelectorAll('#community-videos video:not(.qt-preview-frame)').forEach(v=>v.dispatchEvent(new Event('qt-stop-video')));
+          qtSocialBody().replaceChildren();qtSocialMsg('');
+          document.getElementById('qt-social-title').textContent=({me:'My Profile',user:'Member Profile',people:'Discover People',chats:'Qué tal Chat',chat:'Conversation',chatinfo:'Contact info',requests:'Message Requests',statuses:'Status Updates'})[type]||'Qué tal';
+          try {
+            if(type==='me') await qtShowMyProfile();
+            if(type==='user') await qtShowUserProfile(uid);
+            if(type==='people') await qtShowPeople();
+            if(type==='chats') await qtShowChats();
+            if(type==='chat') await qtShowConversation(uid);
+            if(type==='chatinfo') await qtShowChatInfo(uid);
+            if(type==='requests') await qtShowRequests();
+            if(type==='statuses') await qtShowStatuses();
+          } catch(e){qtSocialMsg('Member features are not configured yet: '+(e.message||e));}
+        }
+        function qtClosePanel(){if(qtChatCleanup){qtChatCleanup();qtChatCleanup=null;}qtStopLive();document.getElementById('qt-social-panel').classList.add('hidden');qtCurrentPanel=null;qtConversationRefresh=null;}
+        async function qtShowMyProfile(){
+          const p=await qtReadProfile(activeUser.id)||{};
+          const form=el('div','qt-social-card');
+          const head=el('div','flex items-center gap-3');
+          const avatar=qtAvatar(p,p.display_name||activeUser.user_metadata?.username||'You');
+          head.append(avatar,el('strong','',p.display_name||activeUser.user_metadata?.username||'Your profile'));
+          const name=qtField('Display name',p.display_name||activeUser.user_metadata?.username||'',60);
+          const bio=qtField('Biography (optional)',p.bio||'',240,true);
+          const status=qtField('Current status (optional)',p.status||'',140,true);
+          const fileLab=el('label','block text-sm','Profile picture (JPG, PNG or WebP, max 2 MB)');
+          const file=el('input');file.type='file';file.accept='image/*';file.hidden=true;fileLab.append(file);
+          const photoCamera=el('input');photoCamera.type='file';photoCamera.accept='image/*';photoCamera.setAttribute('capture','environment');photoCamera.hidden=true;
+          const photoStatus=el('p','qt-social-mini','Choose a photo from Gallery or take a new picture, then tap Save profile.');
+          function qtPickedPhoto(source){
+            const picked=source.files?.[0];if(!picked)return;
+            if(source!==file){try{const dt=new DataTransfer();dt.items.add(picked);file.files=dt.files;}catch(e){qtSocialMsg('Please select the photo using Gallery instead.');return;}}
+            photoStatus.textContent='Selected: '+picked.name+' — tap Save profile.';
+            qtSocialMsg('Photo selected. Tap Save profile.');
+          }
+          file.onchange=()=>qtPickedPhoto(file);
+          photoCamera.onchange=()=>qtPickedPhoto(photoCamera);
+          const galleryBtn=qtBtn('🖼️ Open gallery',()=>{
+            // Request an image-only selection. Android/browser chooses the picker.
+            file.click();
+          },true);
+          const cameraBtn=qtBtn('📸 Take photo',()=>photoCamera.click(),true);
+          const photoControls=qtRow(galleryBtn,cameraBtn);
+          const cameraBadge=el('button','qt-profile-camera-badge','📷');cameraBadge.type='button';cameraBadge.setAttribute('aria-label','Change profile picture');cameraBadge.title='Change profile picture';cameraBadge.onclick=(event)=>{event.stopPropagation();galleryBtn.click();};
+          const avatarWrap=el('div','qt-own-avatar-wrap');avatarWrap.append(avatar,cameraBadge);
+          head.replaceChildren(avatarWrap,el('strong','',p.display_name||activeUser.user_metadata?.username||'Your profile'));
+          avatarWrap.onclick=(event)=>{if(event.target===cameraBadge)return;qtOpenPhotoViewer(p,p.display_name||activeUser.user_metadata?.username||'Your profile');};
+          avatarWrap.setAttribute('aria-label','View your profile picture');
+
+          const save=qtBtn('Save profile',async()=>{
+            save.disabled=true;qtSocialMsg('Saving...');
+            try {
+              let avatarPath=p.avatar_path||null;
+              const photo=file.files?.[0];
+              if(photo){
+                if(!['image/jpeg','image/png','image/webp'].includes(photo.type)||photo.size>2*1024*1024)throw Error('Use a JPG, PNG or WebP under 2 MB.');
+                const ext={'image/jpeg':'jpg','image/png':'png','image/webp':'webp'}[photo.type];
+                avatarPath=`${activeUser.id}/avatar-${crypto.randomUUID()}.${ext}`;
+                const {error}=await sb.storage.from('quetal-avatars').upload(avatarPath,photo,{contentType:photo.type,upsert:false});
+                if(error)throw error;
+              }
+              const {error}=await sb.from('qt_profiles').upsert({user_id:activeUser.id,display_name:name.field.value.trim().slice(0,60),bio:bio.field.value.trim().slice(0,240),status:status.field.value.trim().slice(0,140),avatar_path:avatarPath},{onConflict:'user_id'});
+              if(error)throw error;
+              qtSocialMsg('Profile saved!');await qtShowMyProfile();
+            }catch(e){qtSocialMsg('Could not save: '+e.message);}finally{save.disabled=false;}
+          });
+          form.append(head,name.wrap,bio.wrap,status.wrap,fileLab,photoCamera,photoControls,photoStatus,save);
+          const videos=el('div','qt-social-card');videos.append(el('h3','font-bold','My videos'));
+          const {data,error}=await sb.from('video_posts').select('caption,created_at').eq('user_id',activeUser.id).order('created_at',{ascending:false}).limit(30);
+          if(!error)videos.append(...(data?.length?data.map(v=>el('p','text-sm border-b border-zinc-700 py-2',v.caption)): [el('p','qt-social-mini','No uploaded videos yet.') ]));
+          qtSocialBody().replaceChildren(form,videos);
+        }
+        async function qtBlocked(uid){
+          const {data,error}=await sb.from('qt_blocks').select('blocker_id').eq('blocker_id',activeUser.id).eq('blocked_id',uid).maybeSingle();
+          if(error)throw error;return !!data;
+        }
+        async function qtShowUserProfile(uid){
+          if(uid===activeUser.id)return qtShowMyProfile();
+          const p=await qtReadProfile(uid);
+          if(!p){qtSocialMsg('This member has not created a public profile yet.');return;}
+          const card=el('div','qt-social-card');
+          const img=qtAvatar(p,p.display_name||'Member');
+          card.append(qtRow(img,el('strong','',p.display_name||'Qué tal member')),
+            el('p','text-sm',p.bio||'No biography yet.'),el('p','qt-social-mini','Status: '+(p.status||'No status')));
+          const blocked=await qtBlocked(uid);
+          const actions=qtRow();
+          if(!blocked)actions.append(qtBtn('Message request',async()=>{
+            const {data:existing,error:lookupError}=await sb.from('qt_message_requests').select('status').eq('sender_id',activeUser.id).eq('recipient_id',uid).maybeSingle();
+            if(lookupError){qtSocialMsg('Could not check request: '+lookupError.message);return;}
+            if(existing){qtSocialMsg(existing.status==='pending'?'Your message request is already waiting for a reply.':existing.status==='accepted'?'Your request was accepted. Open Chat to message this member.':'This request was previously declined.');return;}
+            const {error}=await sb.from('qt_message_requests').insert({sender_id:activeUser.id,recipient_id:uid});
+            qtSocialMsg(error?(error.code==='23505'?'A request to this member already exists.':'Request not sent: '+error.message):'Message request sent. They must accept before you can chat.');
+          }));
+          actions.append(qtBtn(blocked?'Unblock member':'Block member',async()=>{
+            const result=blocked?await sb.from('qt_blocks').delete().eq('blocker_id',activeUser.id).eq('blocked_id',uid):await sb.from('qt_blocks').insert({blocker_id:activeUser.id,blocked_id:uid});
+            if(result.error)qtSocialMsg(result.error.message);else qtOpenPanel('user',uid);
+          },true));
+          actions.append(qtBtn('Report member',()=>qtReportForm('user',uid),true));
+          card.append(actions);qtSocialBody().replaceChildren(card);
+        }
+        async function qtShowPeople(){
+          const search=qtField('Find members by name','',60);
+          const results=el('div','grid gap-2');
+          const find=qtBtn('Search',async()=>{
+            results.replaceChildren();
+            const name=search.field.value.trim().replace(/[%_]/g,'');
+            if(name.length<2){qtSocialMsg('Enter at least 2 letters.');return;}
+            const {data,error}=await sb.from('qt_profiles').select('user_id,display_name,status,avatar_path').ilike('display_name','%'+name+'%').neq('user_id',activeUser.id).limit(20);
+            if(error){qtSocialMsg(error.message);return;}
+            if(!data?.length){results.append(el('p','qt-social-mini','No matching profiles yet.'));return;}
+            data.forEach(p=>{
+              const c=el('div','qt-social-card');
+              c.append(qtRow(qtAvatar(p,p.display_name||'Member'),el('strong','',p.display_name||'Member')),el('p','qt-social-mini',p.status||''),qtBtn('View profile',()=>qtOpenPanel('user',p.user_id)));
+              results.append(c);
+            });
+          });
+          qtSocialBody().replaceChildren(search.wrap,find,results);
+        }
+        async function qtShowChats(){
+          if(qtCurrentPanel?.type!=='chats')return;
+          const body=qtSocialBody();
+          const {data,error}=await sb.from('qt_message_requests').select('id,sender_id,recipient_id,status').eq('status','accepted').or(`sender_id.eq.${activeUser.id},recipient_id.eq.${activeUser.id}`).limit(100);
+          if(error)throw error;
+          const entries=await Promise.all((data||[]).map(async r=>{
+            const other=r.sender_id===activeUser.id?r.recipient_id:r.sender_id;
+            const [p,result]=await Promise.all([qtReadProfile(other),sb.from('qt_messages').select('sender_id,body,created_at').eq('request_id',r.id).order('created_at',{ascending:false}).limit(100)]);
+            const messages=result.data||[];const last=messages[0];const marker=qtGetRead(r.id);
+            const unread=messages.filter(m=>m.sender_id!==activeUser.id&&(!marker||m.created_at>marker)).length;
+            return {other,p,last,unread};
+          }));
+          if(qtCurrentPanel?.type!=='chats')return;
+          entries.sort((a,b)=>(b.last?.created_at||'').localeCompare(a.last?.created_at||''));
+          const actions=qtRow(qtBtn('Message requests',()=>qtOpenPanel('requests')),qtBtn('Find people',()=>qtOpenPanel('people'),true),qtBtn('🔔 Enable phone alerts',qtEnableNotifications,true));
+          const list=el('div','qt-chat-list');
+          if(!entries.length)list.append(el('p','qt-social-mini','No conversations yet. Search for a member and send a message request.'));
+          entries.forEach(e=>{
+            const name=e.p?.display_name||'Member';const item=el('button','qt-chat-item'+(e.unread?' qt-unread':''));item.type='button';item.onclick=()=>qtOpenPanel('chat',e.other);
+            const info=el('div','qt-chat-info');info.append(el('span','qt-chat-name',name),el('span','qt-chat-preview',e.last?(e.last.sender_id===activeUser.id?'You: ':'')+(e.last.body?.startsWith(qtMediaPrefix)?'📎 Attachment':e.last.body):'Start your conversation'));
+            const side=el('div','qt-chat-side');side.append(el('span','qt-social-mini',qtWhen(e.last?.created_at)));if(e.unread)side.append(el('span','qt-chat-count',String(e.unread)));
+            item.append(qtAvatar(e.p,name),info,side);list.append(item);
+          });
+          body.replaceChildren(qtThemePicker(),actions,list);
+        }
+        async function qtShowRequests(){
+          const body=qtSocialBody();body.replaceChildren();
+          const {data,error}=await sb.from('qt_message_requests').select('id,sender_id').eq('recipient_id',activeUser.id).eq('status','pending').limit(50);
+          if(error)throw error;
+          if(!data?.length){body.append(el('p','qt-social-mini','No pending message requests.'));return;}
+          for(const r of data){const p=await qtReadProfile(r.sender_id);const card=el('div','qt-social-card');
+            card.append(el('strong','',p?.display_name||'Member'),qtRow(
+              qtBtn('Accept',()=>qtRespondRequest(r.id,'accepted')),
+              qtBtn('Decline',()=>qtRespondRequest(r.id,'declined'),true),
+              qtBtn('View profile',()=>qtOpenPanel('user',r.sender_id),true)));
+            body.append(card);}
+        }
+        async function qtRespondRequest(id,status){
+          const {error}=await sb.from('qt_message_requests').update({status}).eq('id',id).eq('recipient_id',activeUser.id);
+          if(error)qtSocialMsg(error.message);else {await qtRefreshRequestBadge();qtOpenPanel('requests');}
+        }
+        async function qtShowChatInfo(uid){
+          const p=await qtReadProfile(uid),name=p?.display_name||'Member';const card=el('div','qt-social-card');card.classList.add('qt-private-media');const photoBtn=el('button');photoBtn.type='button';photoBtn.style.cssText='background:none;border:0;padding:0;width:fit-content';photoBtn.setAttribute('aria-label','View profile picture');photoBtn.append(qtAvatar(p,name));photoBtn.onclick=()=>qtOpenPhotoViewer(p,name);card.append(photoBtn,el('h2','text-xl font-bold',name),el('p','text-sm',p?.bio||''),el('p','qt-social-mini',p?.status||''),qtBtn('View member profile',()=>qtOpenPanel('user',uid),true));qtSocialBody().append(card);
+          const {data:req,error}=await sb.from('qt_message_requests').select('id').eq('status','accepted').or(`and(sender_id.eq.${activeUser.id},recipient_id.eq.${uid}),and(sender_id.eq.${uid},recipient_id.eq.${activeUser.id})`);if(error)throw error;
+          const section=el('div','qt-social-card');section.append(el('h3','font-bold','Media, links and docs'));qtSocialBody().append(section);if(!req?.length)return;
+          const result=await sb.from('qt_messages').select('id,body,created_at').in('request_id',req.map(r=>r.id)).order('created_at',{ascending:false}).limit(200);if(result.error)throw result.error;
+          const items=(result.data||[]).filter(m=>!localStorage.getItem('qt-hidden:'+activeUser.id+':'+m.id)&&(m.body?.startsWith(qtMediaPrefix)||/^https?:\/\//i.test(m.body)));if(!items.length)section.append(el('p','qt-social-mini','No shared media or links yet.'));for(const m of items){const row=el('div','qt-social-card');if(m.body.startsWith(qtMediaPrefix)||m.body.startsWith('https://maps.google.com/?q='))row.append(qtMediaNode(m.body));else{const a=el('a','underline',m.body);a.href=m.body;a.target='_blank';a.rel='noopener noreferrer';row.append(a);}row.append(el('p','qt-social-mini',new Date(m.created_at).toLocaleString()));section.append(row);}
+        }
+        async function qtShowConversation(other){
+          const body=qtSocialBody();body.replaceChildren();
+          const {data:req,error:reqErr}=await sb.from('qt_message_requests').select('id').eq('status','accepted')
+            .or(`and(sender_id.eq.${activeUser.id},recipient_id.eq.${other}),and(sender_id.eq.${other},recipient_id.eq.${activeUser.id})`).limit(1);
+          if(reqErr)throw reqErr;
+          if(!req?.length){body.append(el('p','qt-social-mini','An accepted message request is needed before chatting.'));return;}
+          const rId=req[0].id;
+          const profile=await qtReadProfile(other);const name=profile?.display_name||'Member';
+          const box=el('div','qt-chat-screen');const header=el('div','qt-chat-header');const identity=el('div');identity.append(el('strong','',name));const presence=el('div','qt-presence-line','Checking online status…');identity.append(presence);header.append(qtAvatar(profile,name),identity);
+          const list=el('div','qt-chat-messages');list.setAttribute('role','log');list.setAttribute('aria-label','Messages with '+name);
+          const status=el('p','qt-chat-status','Messages update automatically while this chat is open.');const typing=el('p','qt-presence-line','');typing.setAttribute('aria-live','polite');
+          let refreshing=false;let lastFingerprint='';
+          const refresh=async()=>{
+            if(refreshing||qtCurrentPanel?.type!=='chat'||qtCurrentPanel.uid!==other)return;
+            refreshing=true;
+            try{
+              const {data,error}=await sb.from('qt_messages').select('id,sender_id,body,created_at').eq('request_id',rId).order('created_at',{ascending:true}).limit(100);
+              if(error){status.textContent='Could not refresh messages: '+error.message;return;}
+              const messages=data||[];const fingerprint=JSON.stringify(messages);
+              if(fingerprint!==lastFingerprint){
+                const atBottom=list.scrollHeight-list.scrollTop-list.clientHeight<100;
+                if(header.dataset.selecting==='1'){normalHeader();tray.classList.add('hidden');}
+                list.replaceChildren();
+                if(!messages.length)list.append(el('p','qt-social-mini','No messages yet. Say hello!'));
+                messages.forEach(m=>{
+                  if(localStorage.getItem('qt-hidden:'+activeUser.id+':'+m.id))return;
+                  const mine=m.sender_id===activeUser.id;const row=el('div','qt-message-row '+(mine?'qt-mine':'qt-theirs'));
+                  const bubble=el('div','qt-message-bubble');bubble.append(qtMediaNode(m.body));if(m.body?.startsWith(qtMediaPrefix)){try{const c=JSON.parse(m.body.slice(qtMediaPrefix.length)).caption;if(c)bubble.append(el('div','qt-message-text',c));}catch{}}bubble.append(el('div','qt-message-time',qtWhen(m.created_at)));
+                  let hold,x,y; bubble.onpointerdown=e=>{if(e.target.closest('audio,video,button,a'))return;x=e.clientX;y=e.clientY;hold=setTimeout(()=>selectMessage(m,bubble),450);};bubble.onpointerup=bubble.onpointercancel=()=>clearTimeout(hold);bubble.onpointermove=e=>{if(Math.hypot(e.clientX-x,e.clientY-y)>10)clearTimeout(hold);};bubble.oncontextmenu=e=>{e.preventDefault();clearTimeout(hold);selectMessage(m,bubble);};bubble.onclick=e=>{if(header.dataset.selecting==='1'&&!e.target.closest('audio,video,button,a'))selectMessage(m,bubble);};
+                  row.append(bubble);list.append(row);
+                });
+                if(atBottom||!lastFingerprint)list.scrollTop=list.scrollHeight;
+                lastFingerprint=fingerprint;
+              }
+              const lastIncoming=[...messages].reverse().find(m=>m.sender_id!==activeUser.id);
+              if(lastIncoming){qtSetRead(rId,lastIncoming.created_at);qtRefreshRequestBadge().catch(()=>{});}
+              status.textContent='Messages update automatically while this chat is open.';
+            }finally{refreshing=false;}
+          };
+          qtConversationRefresh=refresh;
+          const icon=(name,label,fn)=>{const b=el('button','qt-icon');b.type='button';b.setAttribute('aria-label',label);b.title=label;const i=el('i','fa-solid fa-'+name);b.append(i);b.onclick=fn;return b;};
+          const input=el('textarea');input.rows=1;input.placeholder='Message';input.maxLength=10000;
+          const mediaStatus=el('p','qt-voice-indicator');const tray=el('div','qt-tray hidden');
+          const notify=()=>{if(qtLiveChannel)qtLiveChannel.send({type:'broadcast',event:'message',payload:{user_id:activeUser.id}}).catch(()=>{});};
+          const post=async(message,target=rId)=>{const {error}=await sb.from('qt_messages').insert({request_id:target,sender_id:activeUser.id,body:message});if(error)throw error;notify();await refresh();};
+          let busy=false, recorder=null, stream=null, cancelled=false, alive=true, timer=null, started=0, pending=false, held=false, releasePending=false;
+          const send=icon('microphone','Record voice note',async()=>{if(busy||pending)return;if(recorder?.state==='recording'){recorder.stop();return;}if(input.value.trim()){busy=true;try{await post(input.value.trim());input.value='';update();}catch(e){mediaStatus.textContent=e.message;}finally{busy=false;}return;}await record();});send.classList.add('qt-send');
+          const cameraButton=icon('camera','Camera',()=>showTray('camera'));
+          const update=()=>{input.style.height='auto';input.style.height=Math.min(input.scrollHeight,120)+'px';const sending=!!input.value.trim()||recorder?.state==='recording';send.firstChild.className='fa-solid fa-'+(sending?'paper-plane':'microphone');send.setAttribute('aria-label',sending?'Send':'Record voice note');cameraButton.hidden=!!input.value.trim();};
+          let typingTimeout;input.oninput=()=>{update();qtSendTyping(true);clearTimeout(typingTimeout);typingTimeout=setTimeout(()=>qtSendTyping(false),1600);};
+          const sendMedia=async(file,kind,caption='')=>{mediaStatus.textContent='Uploading '+kind+'…';try{const info=await qtUploadMedia(file,kind);if(!alive)return;await post(qtMediaPrefix+JSON.stringify({...info,caption}));mediaStatus.textContent='Sent';}catch(e){mediaStatus.textContent='Could not send: '+e.message;}};
+          const record=async()=>{if(pending||recorder?.state==='recording')return;pending=true;cancelled=false;try{stream=await navigator.mediaDevices.getUserMedia({audio:true});if(!alive){stream.getTracks().forEach(t=>t.stop());return;}const chunks=[];recorder=new MediaRecorder(stream);recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};recorder.onstop=async()=>{clearInterval(timer);stream.getTracks().forEach(t=>t.stop());const blob=new Blob(chunks,{type:recorder.mimeType||'audio/webm'});recorder=null;update();if(!cancelled&&alive&&blob.size)await sendMedia(blob,'voice');else mediaStatus.textContent='Recording cancelled';};recorder.start();started=Date.now();update();tray.classList.remove('hidden');tray.replaceChildren(qtBtn('Cancel recording',()=>{cancelled=true;recorder?.stop();tray.classList.add('hidden');},true));timer=setInterval(()=>{mediaStatus.textContent='● Recording '+Math.floor((Date.now()-started)/1000)+'s';if(Date.now()-started>=60000)recorder?.stop();},250);if(releasePending){releasePending=false;recorder.stop();}}catch(e){stream?.getTracks().forEach(t=>t.stop());mediaStatus.textContent=e.message;}finally{pending=false;}};
+          let pressTimer, suppress=false;send.onpointerdown=e=>{if(input.value.trim()||recorder||pending)return;held=false;releasePending=false;send.setPointerCapture(e.pointerId);pressTimer=setTimeout(()=>{held=true;record();},350);};send.onpointerup=()=>{clearTimeout(pressTimer);if(held){suppress=true;if(recorder?.state==='recording')recorder.stop();else releasePending=true;}};send.onpointercancel=()=>{clearTimeout(pressTimer);if(held){cancelled=true;recorder?.stop();}};const click=send.onclick;send.onclick=()=>{if(suppress){suppress=false;return;}click();};
+          const picker=(accept,capture,kind)=>{const f=el('input');f.type='file';f.accept=accept;if(capture)f.setAttribute('capture','environment');f.onchange=()=>{const file=f.files?.[0];if(!file)return;preview(file,kind|| (file.type.startsWith('video/')?'video':'photo'));};f.click();};
+          let previewUrl;const preview=(file,kind)=>{if(previewUrl)URL.revokeObjectURL(previewUrl);previewUrl=URL.createObjectURL(file);tray.replaceChildren();tray.classList.remove('hidden');const v=el(kind==='photo'?'img':kind==='video'?'video':'audio','qt-media-preview');v.src=previewUrl;v.controls=true;const cap=el('input');cap.placeholder='Add a caption…';tray.append(v,cap,qtBtn('Send',async()=>{tray.classList.add('hidden');await sendMedia(file,kind,cap.value);}),qtBtn('Cancel',()=>tray.classList.add('hidden'),true));};
+          const showTray=mode=>{tray.replaceChildren();tray.classList.toggle('hidden',false);if(mode==='emoji'){for(const e of Array.from('😀😃😄😁😂🤣😊😍😘🥰😉😎😢😭😡👍👏🙏🔥🎉💕💜🌹'))tray.append(qtBtn(e,()=>{input.setRangeText(e,input.selectionStart,input.selectionEnd,'end');input.focus();update();},true));return;}tray.append(qtBtn('Photo',()=>picker('image/*',true,'photo'),true),qtBtn('Video',()=>picker('video/*',true,'video'),true),qtBtn('Gallery ↑',()=>picker('image/*,video/*',false),true));if(mode!=='camera')tray.append(qtBtn('Audio',()=>picker('audio/*',false,'voice'),true),qtBtn('Location',()=>navigator.geolocation.getCurrentPosition(async p=>{try{await post('https://maps.google.com/?q='+p.coords.latitude+','+p.coords.longitude);tray.classList.add('hidden');}catch(e){mediaStatus.textContent=e.message;}},e=>mediaStatus.textContent=e.message),true));};
+          const popup=el('div','qt-chat-popup hidden');header.append(popup);
+          const closeMenu=()=>popup.classList.add('hidden');
+          const action=(label,fn)=>qtBtn(label,async()=>{closeMenu();try{await fn();}catch(e){mediaStatus.textContent=e.message||String(e);}},true);
+          const photoOpen=()=>qtOpenPhotoViewer(profile,name);
+
+          const infoOpen=()=>qtOpenPanel('chatinfo',other);
+          const block=async()=>{const blocked=await qtBlocked(other);if(!confirm((blocked?'Unblock ':'Block ')+name+'?'))return;const result=blocked?await sb.from('qt_blocks').delete().eq('blocker_id',activeUser.id).eq('blocked_id',other):await sb.from('qt_blocks').insert({blocker_id:activeUser.id,blocked_id:other});if(result.error)throw result.error;mediaStatus.textContent=blocked?'Member unblocked':'Member blocked';if(!blocked)qtOpenPanel('chats');};
+          const report=()=>{const reason=prompt('Why are you reporting this member?');if(reason===null)return;if(reason.trim().length<5){mediaStatus.textContent='Please give a short explanation.';return;}return sb.from('qt_reports').insert({reporter_id:activeUser.id,reported_user_id:other,reason:reason.trim().slice(0,500)}).then(({error})=>{if(error)throw error;mediaStatus.textContent='Report submitted privately for review.';});};
+          const more=()=>{popup.replaceChildren(action('Report',report),action('Block / unblock',block),action('Refresh messages',refresh),action('Back to menu',()=>menu(true)));popup.classList.remove('hidden');};
+          const menu=(force=false)=>{if(force!==true&&!popup.classList.contains('hidden')){closeMenu();return;}popup.replaceChildren(action('View contact',infoOpen),action('Search',()=>{const q=prompt('Search messages');if(q){const found=Array.from(list.children).find(n=>n.textContent.toLowerCase().includes(q.toLowerCase()));if(found)found.scrollIntoView({block:'center'});else mediaStatus.textContent='No matching loaded messages.';}}),action('Media, links and docs',infoOpen),action('Chat theme',()=>{tray.replaceChildren(qtThemePicker());tray.classList.remove('hidden');}),action('More ›',more));popup.classList.remove('hidden');};
+          box.addEventListener('pointerdown',e=>{if(!header.contains(e.target))closeMenu();});
+          const normalHeader=()=>{delete header.dataset.selecting;list.querySelectorAll('.qt-selected').forEach(n=>n.classList.remove('qt-selected'));const avatarButton=el('button','qt-avatar-button');avatarButton.type='button';avatarButton.setAttribute('aria-label','Open profile picture');avatarButton.append(qtAvatar(profile,name));avatarButton.onclick=photoOpen;identity.onclick=infoOpen;identity.setAttribute('role','button');identity.tabIndex=0;identity.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();infoOpen();}};header.replaceChildren(icon('arrow-left','All chats',qtBack),avatarButton,identity,icon('ellipsis-vertical','More options',()=>menu()),popup);closeMenu();};normalHeader();
+          const selectMessage=(m,bubble)=>{window.getSelection()?.removeAllRanges();list.querySelectorAll('.qt-selected').forEach(n=>n.classList.remove('qt-selected'));bubble.classList.add('qt-selected');header.dataset.selecting='1';header.replaceChildren(icon('arrow-left','Cancel selection',normalHeader),el('strong','','1'),icon('copy','Copy',async()=>{try{await navigator.clipboard.writeText(m.body);normalHeader();}catch(e){mediaStatus.textContent=e.message;}}),icon('share','Forward',async()=>{const {data,error}=await sb.from('qt_message_requests').select('id,sender_id,recipient_id').eq('status','accepted').or(`sender_id.eq.${activeUser.id},recipient_id.eq.${activeUser.id}`);if(error){mediaStatus.textContent=error.message;return;}tray.replaceChildren(el('strong','','Forward to'));tray.classList.remove('hidden');for(const r of data||[]){const p=await qtReadProfile(r.sender_id===activeUser.id?r.recipient_id:r.sender_id);tray.append(qtBtn(p?.display_name||'Member',async()=>{try{await post(m.body,r.id);tray.classList.add('hidden');normalHeader();mediaStatus.textContent='Forwarded';}catch(e){mediaStatus.textContent=e.message;}},true));}}),icon('trash','Delete',()=>{tray.replaceChildren();tray.classList.remove('hidden');tray.append(qtBtn('Delete for me (this device)',()=>{localStorage.setItem('qt-hidden:'+activeUser.id+':'+m.id,'1');bubble.parentElement.remove();normalHeader();tray.classList.add('hidden');},true));if(m.sender_id===activeUser.id)tray.append(qtBtn('Delete for everyone',async()=>{if(!confirm('Delete this message for everyone?'))return;const {data,error}=await sb.from('qt_messages').delete().eq('id',m.id).eq('sender_id',activeUser.id).select('id');if(error||!data?.length){mediaStatus.textContent=error?.message||'Server does not permit deletion.';return;}notify();await refresh();normalHeader();tray.classList.add('hidden');},true));}));};
+          const pill=el('div','qt-pill');pill.append(icon('face-smile','Emoji',()=>showTray('emoji')),input,icon('paperclip','Attachments',()=>showTray('attachments')),cameraButton);const composer=el('div','qt-composer');composer.append(pill,send);box.append(header,list,typing,status,tray,mediaStatus,composer);body.append(box);qtStartLive(other,rId,presence,typing,refresh);qtChatCleanup=()=>{alive=false;cancelled=true;clearInterval(timer);clearTimeout(typingTimeout);if(recorder?.state==='recording')recorder.stop();stream?.getTracks().forEach(t=>t.stop());if(previewUrl)URL.revokeObjectURL(previewUrl);};await refresh();
+        }
+        if(window.visualViewport){const fit=()=>{const p=document.getElementById('qt-social-panel');p.style.height=p.classList.contains('qt-conversation')?visualViewport.height+'px':'';};visualViewport.addEventListener('resize',fit);new MutationObserver(fit).observe(document.getElementById('qt-social-panel'),{attributes:true,attributeFilter:['class']});}
+        function qtSelectRecordedVideo(input){
+          const file=input.files?.[0],target=document.getElementById('video-file');if(!file||!target)return;
+          const dt=new DataTransfer();dt.items.add(file);target.files=dt.files;previewSelectedVideo();
+        }
+        const qtMediaPrefix='[QT_MEDIA_V1]';
+        async function qtUploadMedia(file,kind){
+          if(!activeUser)throw Error('Sign in first.');
+          const limits={photo:2*1024*1024,voice:3*1024*1024,video:15*1024*1024};
+          if(!file||file.size>limits[kind])throw Error(kind+' must be smaller than '+Math.round(limits[kind]/1048576)+' MB.');
+          if(kind==='photo'&&!['image/jpeg','image/png','image/webp'].includes(file.type))throw Error('Choose JPG, PNG or WebP.');
+          if(kind==='voice'&&!file.type.startsWith('audio/'))throw Error('Audio recording not supported on this device.');
+          const ext=kind==='photo'?(file.type==='image/png'?'png':file.type==='image/webp'?'webp':'jpg'):kind==='voice'?(file.type.includes('mp4')?'m4a':'webm'):'mp4';
+          const path=activeUser.id+'/'+crypto.randomUUID()+'.'+ext;
+          const {error}=await sb.storage.from('qt-media').upload(path,file,{contentType:file.type,upsert:false});if(error)throw error;
+          return {kind,path};
+        }
+        function qtMediaNode(body){
+          const loc=typeof body==='string'&&body.match(/^https:\/\/maps\.google\.com\/\?q=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/);
+          if(loc&&Math.abs(Number(loc[1]))<=90&&Math.abs(Number(loc[2]))<=180){
+            const lat=Number(loc[1]),lon=Number(loc[2]);const card=el('div','qt-location-card');
+            const map=el('iframe');map.title='Shared location map';map.loading='lazy';map.referrerPolicy='no-referrer';map.src='https://maps.google.com/maps?q='+encodeURIComponent(lat+','+lon)+'&z=15&output=embed';
+            const link=el('a','','📍 Shared location · Get directions');link.href='https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(lat+','+lon);link.target='_blank';link.rel='noopener noreferrer';card.append(map,link);return card;
+          }
+          if(!body?.startsWith(qtMediaPrefix)){const d=el('div','qt-message-text',body||'');if(body?.length>500){d.textContent=body.slice(0,500)+'…';d.append(qtBtn('Read more',()=>{d.textContent=body;},true));}return d;}
+          try{
+            const info=JSON.parse(body.slice(qtMediaPrefix.length));
+            if(!['photo','voice','video'].includes(info.kind)||typeof info.path!=='string'||!/^[-\w]+\/[\w.-]+$/.test(info.path))throw Error('Invalid media');
+            const wrap=el('div');
+            const media=el(info.kind==='photo'?'img':info.kind==='voice'?'audio':'video','qt-media-preview');
+            if(info.kind==='photo'){media.alt='Chat photo';media.loading='lazy';}
+            else{media.controls=true;media.preload='metadata';if(info.kind==='video')media.playsInline=true;}
+            const note=el('div','qt-message-text','Loading attachment…');
+            wrap.append(media,note);let loading=false;
+            const load=async()=>{if(loading)return;loading=true;note.textContent='Loading attachment…';try{
+              const {data,error}=await sb.storage.from('qt-media').createSignedUrl(info.path,3600);
+              if(error||!data?.signedUrl)throw Error(error?.message||'No signed URL returned');
+              media.src=data.signedUrl;note.textContent='';
+            }catch(e){note.textContent='Attachment unavailable: '+e.message+' ';note.append(qtBtn('Retry',load,true));}finally{loading=false;}};
+            media.addEventListener('error',()=>{note.textContent='Could not play or load attachment. ';note.append(qtBtn('Retry',load,true));});
+            load();return wrap;
+          }catch{return el('div','qt-message-text','Attachment unavailable');}
+        }
+        async function qtShowStatuses(){
+          const body=qtSocialBody();body.replaceChildren();
+          const card=el('div','qt-social-card');card.append(el('h3','font-bold','Share a status'));
+          const words=qtField('What’s happening? (optional)','',140,true);
+          const photo=el('input');photo.type='file';photo.accept='image/jpeg,image/png,image/webp';photo.hidden=true;
+          const camera=el('input');camera.type='file';camera.accept='image/*';camera.setAttribute('capture','environment');camera.hidden=true;
+          const picked=el('p','qt-social-mini','Text or photo status • visible for 24 hours');
+          camera.onchange=()=>{if(camera.files?.[0]){const dt=new DataTransfer();dt.items.add(camera.files[0]);photo.files=dt.files;picked.textContent='Photo ready';}};
+          photo.onchange=()=>{picked.textContent=photo.files?.[0]?'Photo ready':'No photo selected';};
+          const publish=qtBtn('Post status',async()=>{
+            publish.disabled=true;qtSocialMsg('Posting status…');
+            try{
+              const text=words.field.value.trim();let media_path=null;
+              if(photo.files?.[0])media_path=(await qtUploadMedia(photo.files[0],'photo')).path;
+              if(!text&&!media_path)throw Error('Add some text or a photo.');
+              const {error}=await sb.from('qt_status_posts').insert({user_id:activeUser.id,body:text,media_path});if(error)throw error;
+              qtSocialMsg('Status posted!');await qtShowStatuses();
+            }catch(e){qtSocialMsg('Could not post: '+e.message);}finally{publish.disabled=false;}
+          });
+          card.append(words.wrap,photo,camera,qtRow(qtBtn('📸 Camera',()=>camera.click(),true),qtBtn('🖼️ Gallery',()=>photo.click(),true)),picked,publish);
+          const list=el('div','qt-social-card');list.append(el('h3','font-bold','Recent statuses'));
+          const since=new Date(Date.now()-86400000).toISOString();
+          const {data,error}=await sb.from('qt_status_posts').select('id,user_id,body,media_path,created_at').gte('created_at',since).order('created_at',{ascending:false}).limit(40);
+          if(error){list.append(el('p','qt-social-error','Status storage needs setup: '+error.message));}
+          else if(!data?.length)list.append(el('p','qt-social-mini','No statuses yet.'));
+          else for(const item of data){
+            const profile=await qtReadProfile(item.user_id).catch(()=>null);const entry=el('div','qt-status-item');
+            entry.append(qtRow(qtAvatar(profile,profile?.display_name||'Member'),el('strong','',profile?.display_name||'Member')));
+            if(item.body)entry.append(el('p','text-sm',item.body));
+            if(item.media_path){const im=el('img');im.loading='lazy';im.alt='Status photo';im.src=sb.storage.from('qt-media').getPublicUrl(item.media_path).data.publicUrl;entry.append(im);}
+            entry.append(el('p','qt-social-mini',new Date(item.created_at).toLocaleString()));
+            if(item.user_id===activeUser.id)entry.append(qtBtn('Delete',async()=>{const {error}=await sb.from('qt_status_posts').delete().eq('id',item.id).eq('user_id',activeUser.id);if(error)qtSocialMsg(error.message);else qtShowStatuses();},true));
+            list.append(entry);
+          }
+          body.append(card,list);
+        }
+        function qtReportForm(type,target){
+          const reason=qtField('Why are you reporting this member?','',500,true);
+          const card=el('div','qt-social-card');
+          card.append(el('strong','','Report member'),reason.wrap,qtBtn('Submit report',async()=>{
+            const details=reason.field.value.trim();if(details.length<5){qtSocialMsg('Please give a short explanation.');return;}
+            const {error}=await sb.from('qt_reports').insert({reporter_id:activeUser.id,reported_user_id:target,reason:details});
+            if(error)qtSocialMsg(error.message);else{await qtOpenPanel('user',target);qtSocialMsg('Report submitted privately for review.');}
+          }),qtBtn('Cancel',()=>qtOpenPanel('user',target),true));
+          qtSocialBody().replaceChildren(card);
+        }
+        // Close optional member tools on sign out; existing auth remains unchanged.
+
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.className = 'fixed top-5 right-5 bg-zinc-900 border border-neoncian text-white text-xs font-bold px-4 py-3 rounded-2xl z-50 neon-glow-cyan shadow-xl animate-in fade-in slide-in-from-top duration-200 flex items-center space-x-2';
+            toast.innerHTML = `<i class="fa-solid fa-circle-check text-neoncian"></i><span>${message}</span>`;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2500);
+        }
+    </script>
+</body>
+</html>
